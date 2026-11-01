@@ -41,6 +41,17 @@ function title(tab, l) {
   const telling = live && live !== prog && !/^[~/]|^[A-Za-z]:\\/.test(live) && !live.includes("@") && live.toLowerCase() !== l?.program?.key;
   return tab.name === prog && telling ? live : tab.name;
 }
+// agent-deck: a tab with one agent takes the agent's chat name, so Herdr's
+// alerts ("Claude Code needs you · space / tab") say which chat. Only tabs
+// nobody named, or that this named; a name someone gave a tab stays.
+const NAME_TABS = true;
+const TAB_NAME_MAX = 48;
+function chatTitle(a) {
+  const live = clean(a.title);
+  const telling = live && live !== a.program?.name && !/^[~/]|^[A-Za-z]:\\/.test(live) && !live.includes("@") && live.toLowerCase() !== a.program?.key && !/^\d+$/.test(live);
+  return telling ? (live.length > TAB_NAME_MAX ? live.slice(0, TAB_NAME_MAX - 1) + "\u2026" : live) : null;
+}
+
 const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
 // A sub-agent without a pane isn't in agents(): its raw word, error counting as
 // blocked. It's never done: it reports to its parent, and the parent's done is the news.
@@ -78,6 +89,30 @@ export default class Agents extends View {
     this.changed = JSON.parse(localStorage.getItem("changed") ?? "{}");
     this.pins = JSON.parse(localStorage.getItem("pins") ?? "[]");
     cx.timer.every(30000, (cx) => cx.notify());
+    if (NAME_TABS) {
+      this.named = JSON.parse(localStorage.getItem("namedTabs") ?? "{}"); // tab -> the name this gave it
+      cx.timer.every(3000, () => this.nameTabs());
+    }
+  }
+
+  // agent-deck: see NAME_TABS.
+  nameTabs() {
+    const byTab = {};
+    for (const a of agents()) (byTab[a.tab] ??= []).push(a);
+    const tabs = spaces().flatMap((s) => s.tabs);
+    const named = {};
+    for (const tab of tabs) {
+      const mine = this.named[tab.id];
+      const own = !tab.named || (mine != null && tab.name === mine);
+      if (own && mine != null) named[tab.id] = mine;
+      const list = byTab[tab.id] ?? [];
+      const want = list.length === 1 ? chatTitle(list[0]) : null;
+      if (!own || !want || tab.name === want) continue;
+      run("tab.rename", { id: tab.id, name: want });
+      named[tab.id] = want;
+    }
+    this.named = named;
+    localStorage.setItem("namedTabs", JSON.stringify(named));
   }
 
   // Stamps agents whose state changed. Done and idle count as one: looking at a

@@ -76,6 +76,8 @@ The cards use `popover` background, `border` and `shadow_lg`.
 - `agent-deck-overview.agents` and `agent-deck-overview.terminals` switch its tab while it's open.
 - The tab you used last is remembered.
 
+**Tab names:** a tab holding exactly one agent with a real chat name takes that name, cut to 48 characters. It's checked every 3 seconds and follows the chat if it's renamed. Herdr's own alerts then read `Claude Code needs you`, then `space / <chat name>` instead of `space / 1`. Tabs someone named stay as they are. Clearing a tab's name (an empty `tab.rename`) hands it back. `NAME_TABS = false` at the top of `agent-deck-agents` turns this off.
+
 **Refresh:**
 - Machines: every 15s (Spaces) and 30s (Overview).
 - Terminal output lines: every 8s, one `hc read` at a time, only while the Terminals tab shows.
@@ -115,6 +117,7 @@ Runs programs and reads files:
 - **Commands:** `foreground.argv[0]` can be a full path (`/Library/Developer/CommandLineTools/usr/bin/make`). Show its last path part.
 - **Wrapped rows:** use `items_start()`, or cards of different heights drift.
 - **`/private` prefix:** macOS reports `/private/tmp/…`. Strip `/private` before `/tmp` and `/var`, and show home as `~`.
+- **Alerts:** Herdr draws its agent alerts with the shipped `toast` mod: the program name and status as the title, `space / tab` below it. Edits to a shipped mod are reverted at the next start, so the chat name reaches the alert through the tab name (`tab.rename {id, name}`). Remember which names this mod set (`localStorage`), and only rename tabs that are unnamed (`named` false) or still carry the name it set, so a person's name is never overwritten.
 - **IDs:** a `HoverCard` needs a stable id per row, and its trigger and content are slots, not children.
 - **`close`:** don't name a View method `close`: Herdr calls a View's `close(cx)` itself when an overlay goes.
 - **Base:** `agent-deck-spaces` is based on the shipped `spaces` of Herdr 0.1.11 (drag-reorder with a drop line and a same-machine guard). When a later Herdr changes that mod, re-apply the `agent-deck:` changes to the new one.
@@ -127,5 +130,6 @@ Runs programs and reads files:
 - `make test` running in a shell shows `1 shell · 1 busy` on the space and a `make test` card marked `running` with its last 2 output lines under Terminals.
 - With the sidebar dragged under 160px, resting on an agent number shows its card to the right within about ¼ second; clicking it focuses the agent.
 - A terminal started with `hc run --bg` outside Herdr (in no space) shows on its machine lane as `hidden`; clicking it peeks.
+- An unnamed tab with a Claude Code agent whose chat is called `Fix login` is called `Fix login` within 3 seconds, and when that agent needs you the alert's second line reads `<space> / Fix login`. A tab you renamed yourself keeps your name.
 - `⌘⇧O` opens the Overview and pressing it again closes it; with a remote machine added, its lane and strip chip show its `hc` version.
 - `herdr-app check` passes for all three mods.
