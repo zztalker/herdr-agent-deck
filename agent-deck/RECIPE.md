@@ -83,6 +83,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
 ## Built from
 
 - **`layouts/agent-deck.json`:** a clone of Herdr's `main` layout with `spaces` → `agent-deck-spaces` and `agents` → `agent-deck-agents`.
+- **`layouts/agent-deck-preview.png`:** the Settings picture (root `"preview"`): the Overview's Agents tab, 480×300 (1.6:1, the shape Settings cards show).
 - **`mods/agent-deck-agents`:** modified from the shipped `agents` mod. It adds:
   - `label()`, which prefers the agent's own title (its chat name) when it is not a path, prompt or the program name;
   - the card row;

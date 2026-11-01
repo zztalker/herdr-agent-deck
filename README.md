@@ -14,7 +14,7 @@ It shows every agent and terminal on every machine. Space rows list their chats,
 
 Ask an agent in Herdr to add `github.com/zztalker/herdr-agent-deck/tree/main/agent-deck`, or by hand:
 
-1. Copy `agent-deck/layouts/agent-deck.json` to `~/.config/herdr-app/layouts/` and each `agent-deck/mods/*` folder to `~/.config/herdr-app/mods/`.
+1. Copy `agent-deck/layouts/agent-deck.json` and `agent-deck/layouts/agent-deck-preview.png` (its picture in Settings) to `~/.config/herdr-app/layouts/` and each `agent-deck/mods/*` folder to `~/.config/herdr-app/mods/`.
 2. Merge `agent-deck/keys.json` into `~/.config/herdr-app/keys.json` (it adds `cmd-shift-o`).
 3. Run `herdr-app do layout.switch --name agent-deck`. `ctrl-shift-l` switches back.
 

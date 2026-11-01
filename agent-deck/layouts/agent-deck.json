@@ -1,6 +1,21 @@
 {
   "id": "root",
   "type": "row",
+  "background": "canvas",
+  "terminal_padding": [
+    14,
+    12
+  ],
+  "divider": {
+    "width": 1,
+    "color": "border"
+  },
+  "titlebar": "none",
+  "traffic_lights": [
+    12,
+    16
+  ],
+  "preview": "layouts/agent-deck-preview.png",
   "children": [
     {
       "id": "sidebar",
@@ -165,19 +180,5 @@
       ],
       "resizable": false
     }
-  ],
-  "background": "canvas",
-  "terminal_padding": [
-    14,
-    12
-  ],
-  "divider": {
-    "width": 1,
-    "color": "border"
-  },
-  "titlebar": "none",
-  "traffic_lights": [
-    12,
-    16
   ]
 }
