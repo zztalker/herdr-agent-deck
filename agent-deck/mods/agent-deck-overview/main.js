@@ -3,7 +3,7 @@
 // Opened with `mod.open:agent-deck-overview` (again: closes it); a card goes to its agent.
 
 import { View, div, svg, image } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
+import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { spaces, agents, terminals, panes, run, hc, theme, props, closeOverlay, settings, nextCommand } from "herdr";
 
 const ORDER = ["blocked", "done", "working", "idle"];
@@ -35,12 +35,21 @@ function icon(p, size, color) {
 const short = (cwd) => (cwd ? cwd.replace(/^\/private(?=\/(tmp|var)\/)/, "").replace(/^\/(Users|home)\/[^/]+/, "~").replace(/^\/root(?=\/|$)/, "~") : "");
 const PREVIEW = 2; // last non-empty screen lines on a terminal card
 const machineOf = (address) => (address.includes("/") ? address.slice(0, address.lastIndexOf("/")) : null);
+// The filter: every word typed must appear somewhere in what a card says.
+const matches = (words, ...parts) => {
+  const text = parts.flat().filter(Boolean).join(" ").toLowerCase();
+  return words.every((w) => text.includes(w));
+};
 
 export default class Overview extends View {
   init(_props, cx) {
     this.machines = [];
     this.tab = localStorage.getItem("tab") ?? "agents";
     this.preview = {}; // address -> its last lines
+    this.query = "";
+    this.input = InputState.new({ placeholder: "Filter: name, machine, space, command…" });
+    this.input.on("change", (_e, cx) => { this.query = this.input.value(); cx.notify(); });
+    this.input.focus();
     this.refresh(cx);
     this.read(cx);
     cx.timer.every(30000, (cx) => this.refresh(cx));
@@ -94,6 +103,13 @@ export default class Overview extends View {
   dismiss() {
     const id = props()?.overlay;
     if (id) closeOverlay(id);
+  }
+
+  clearFilter(cx) {
+    this.query = "";
+    this.input.set_value("");
+    this.input.focus();
+    cx.notify();
   }
 
   pills(t, list) {
@@ -184,6 +200,8 @@ export default class Overview extends View {
 
     const spaceOf = new Map(sp.map((s) => [s.id, s]));
     const machineOfAgent = (a) => spaceOf.get(a.space)?.machine ?? null;
+    const words = this.query.toLowerCase().split(/\s+/).filter(Boolean);
+    const shownAgents = all.filter((a) => matches(words, chatName(a), a.program?.name, WORD[a.status], a.space_name, a.tab_name, machineOfAgent(a) ?? "this computer local"));
 
     // A strip of machines: state, hc version, terminals.
     const strip = h_flex().id("ov-machines").flex_none().flex_wrap().gap(8).px(16).py(8).border_b(1).border_color(t.border)
@@ -203,7 +221,7 @@ export default class Overview extends View {
     // A lane per state, in this order; inside, agents grouped by machine.
     const LANES = ["working", "blocked", "done", "idle"];
     const lane = (k) => {
-      const list = all.filter((a) => a.status === k);
+      const list = shownAgents.filter((a) => a.status === k);
       const groups = names.map((m) => [m, list.filter((a) => machineOfAgent(a) === m).sort((x, y) => y.seq - x.seq)]).filter(([, g]) => g.length);
       // An empty lane keeps a narrow column; the others share the rest.
       return v_flex().id(`ov-lane-${k}`).when(list.length > 0, (el) => el.flex_1().min_w(0)).when(list.length === 0, (el) => el.w(150).flex_none()).min_h(0).rounded(10).bg(t.chrome).border(1).border_color(t.border)
@@ -212,7 +230,7 @@ export default class Overview extends View {
           .child(div().font_semibold().text_color(t.foreground).child(k === "blocked" ? "Needs you" : WORD[k][0].toUpperCase() + WORD[k].slice(1)))
           .child(div().text_size(12).text_color(t.dim).child(String(list.length))))
         .child(v_flex().id(`ov-lane-body-${k}`).flex_1().min_h(0).p(8).gap(10).overflow_y_scrollbar()
-          .when(list.length === 0, (el) => el.child(div().p(4).text_size(12).text_color(t.dim).child("None")))
+          .when(list.length === 0, (el) => el.child(div().p(4).text_size(12).text_color(t.dim).child(words.length ? "No match" : "None")))
           .children(groups.map(([m, g]) => v_flex().id(`ov-${k}-${m ?? "local"}`).gap(6).flex_none()
             .child(h_flex().gap(6).items_center().px(2).text_size(11).text_color(t.dim)
               .child(svg(`mods/workspace-chrome/${m ? "server" : "monitor"}.svg`).size(12).flex_none())
@@ -225,11 +243,12 @@ export default class Overview extends View {
     // Terminals: a lane per machine; shown ones first, busy before idle, hidden last.
     const statusOf = new Map(all.map((a) => [a.address, a.status]));
     const titles = new Map(panes().filter((p) => p.terminal).map((p) => [p.terminal, p.title]));
+    const shownTerms = live.filter((x) => matches(words, x.address, x.program?.name, x.foreground?.argv?.join(" "), x.title, titles.get(x.address), x.cwd, x.foreground?.cwd, x.labels?.where, inPanes.has(x.address) ? "" : "hidden", x.report?.msg, this.preview[x.address], machineOf(x.address) ?? "this computer local"));
     const termLane = (m) => {
       const machine = this.machines.find((k) => k.name === m);
       const connected = !m || machine?.state === "connected";
       const rank = (x) => (inPanes.has(x.address) ? 0 : 4) + (x.program?.agent ? 1 : x.program?.shell ? 2 : 0);
-      const list = live.filter((x) => machineOf(x.address) === m).sort((a, b) => rank(a) - rank(b) || (b.created_ms ?? 0) - (a.created_ms ?? 0));
+      const list = shownTerms.filter((x) => machineOf(x.address) === m).sort((a, b) => rank(a) - rank(b) || (b.created_ms ?? 0) - (a.created_ms ?? 0));
       const busyN = list.filter((x) => !x.program?.agent && !x.program?.shell).length;
       const hidden = list.filter((x) => !inPanes.has(x.address)).length;
       return v_flex().id(`ov-tlane-${m ?? "local"}`).flex_1().min_w(0).min_h(0).rounded(10).bg(t.chrome).border(1).border_color(t.border)
@@ -252,12 +271,29 @@ export default class Overview extends View {
       .size_full()
       .min_h(0)
       .bg(t.background ?? t.chrome)
+      // Esc clears the filter first, then closes.
+      .on_key_down((e, cx) => {
+        if (e.key !== "escape") return;
+        if (this.query) this.clearFilter(cx);
+        else this.dismiss();
+        cx.stop_propagation();
+      })
       .child(h_flex().h(44).flex_none().px(16).gap(10).items_center().border_b(1).border_color(t.border)
         .child(div().text_size(15).font_semibold().text_color(t.foreground).child("Overview"))
-        .child(h_flex().gap(2).p(2).rounded(8).bg(t.chrome).child(tabBtn("agents", `Agents ${all.length}`)).child(tabBtn("terminals", `Terminals ${live.length}`)))
+        .child(h_flex().gap(2).p(2).rounded(8).bg(t.chrome)
+          .child(tabBtn("agents", words.length ? `Agents ${shownAgents.length}/${all.length}` : `Agents ${all.length}`))
+          .child(tabBtn("terminals", words.length ? `Terminals ${shownTerms.length}/${live.length}` : `Terminals ${live.length}`)))
         .child(div().text_size(12).text_color(t.dim).child(`${names.length} machine${names.length === 1 ? "" : "s"}`))
+        // agent-deck: type to hide the cards that don't match.
+        .child(h_flex().id("ov-filter").flex_1().max_w(360).h(28).px(8).gap(6).items_center().rounded(7).border(1).border_color(words.length ? t.accent : t.border).bg(t.chrome)
+          .child(svg("mods/workspace-chrome/search.svg").size(13).flex_none().text_color(t.dim))
+          .child(Input.new(this.input).flex_1().h_full().text_size(12).text_color(t.foreground))
+          .when(words.length > 0, (el) => el.child(div().id("ov-filter-clear").flex_none().text_color(t.dim).cursor_pointer().hover((s) => s.text_color(t.foreground))
+            .tooltip("Clear (Esc)")
+            .on_click((_e, cx) => this.clearFilter(cx))
+            .child(svg("mods/workspace-chrome/x.svg").size(12)))))
         .child(div().flex_1())
-        .when(!onTerms, (el) => el.children(this.pills(t, all)))
+        .when(!onTerms, (el) => el.children(this.pills(t, shownAgents)))
         .child(div().id("ov-close").p(4).rounded(4).text_color(t.dim).cursor_pointer()
           .hover((s) => s.bg(t.hover).text_color(t.foreground))
           .on_click(() => this.dismiss())

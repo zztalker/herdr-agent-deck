@@ -43,7 +43,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
 **Main area:** the shipped tab bar (42px), panes, a `files`/`changes` panel (368px) and the `workspace-status` bar (28px). These are unchanged from Herdr's main layout.
 
 **Overview:** a dialog at 85% × 85% of the window.
-- **Title row** (44px): `Overview`, the tab switch `Agents N | Terminals N`, the machine count, status pills (Agents tab only) and a close button.
+- **Title row** (44px): `Overview`, the tab switch `Agents N | Terminals N`, the machine count, a filter box (up to 360px, `search` icon, `accent` border while it has text), status pills (Agents tab only) and a close button.
 - **Machine strip:** one chip per machine with a connection dot, `N agents · N terms`; the tooltip shows the state, `hc` version and hidden terminals.
 - **Agents tab:** four lanes, left to right:
   - **Working** (`working` color), **Needs you** (`blocked`), **Done** (`done`) and **Idle** (`idle`), each with a 2px colored underline and a count;
@@ -74,6 +74,12 @@ The cards use `popover` background, `border` and `shadow_lg`.
   - a terminal card in a pane runs `pane.focus`;
   - a hidden terminal (in no space) runs `terminal.peek`.
 
+**Filter:** typing goes to the filter box as the Overview opens. Every word must appear on a card (any case), or the card is hidden:
+- an agent: chat name, program, state word, space, tab, machine (`local` for this computer);
+- a terminal: command, folder, `space / tab` or `hidden`, address, title, last lines, machine.
+
+While it has text, the tabs read `Agents 3/9`, the pills count only what matches and empty lanes say `No match`. The `×` or `Esc` clears it; `Esc` again closes the Overview.
+
 **Keys and commands:**
 - `⌘⇧O` (`mod.open:agent-deck-overview`) toggles the Overview; `Esc` closes it.
 - `agent-deck-overview.agents` and `agent-deck-overview.terminals` switch its tab while it's open.
@@ -102,7 +108,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
 - **`mods/agent-deck-overview`:** new, `mod.json` overlay `{ kind: "dialog", width: 0.85, height: 0.85 }`.
   - It reads `agents()`, `spaces()` (tab `working_since` / `changed_at` for time in state), `terminals()` (`foreground.argv`, `foreground.cwd`, `labels.where`, `created_ms`, `report.msg`) and `panes()`.
   - It runs `hc machine ls --json` and `hc read <address>`.
-  - It uses `nextCommand()` for the tab commands.
+  - It uses `nextCommand()` for the tab commands, and `InputState` / `Input` (from `gpui-base`) for the filter.
 - **`keys.json`:** `global` → `cmd-shift-o`.
 - **Shipped mods used as-is:** `workspace-chrome` (also its SVG icons: server, monitor, layers, x, plus, chevron-down/right, pin, pin-off, branch, spinner, clock, check), `tabs`, `pane`, `files`, `changes`, `workspace-status`.
 
@@ -136,5 +142,6 @@ Runs programs and reads files:
 - A terminal started with `hc run --bg` outside Herdr (in no space) shows on its machine lane as `hidden`; clicking it peeks.
 - An unnamed tab with a Claude Code agent whose chat is called `Fix login` is called `Fix login` within 3 seconds, and when that agent needs you the alert's second line reads `<space> / Fix login`. A tab you renamed yourself keeps your name.
 - Clicking `Agents` hides Spaces and gives Agents the height; clicking it again brings Spaces back at the size it had.
+- Typing `ai-ws done` in the Overview leaves only finished agents on ai-ws, and the tab reads `Agents 1/9`; `Esc` brings the rest back.
 - `⌘⇧O` opens the Overview and pressing it again closes it; with a remote machine added, its lane and strip chip show its `hc` version.
 - `herdr-app check` passes for all three mods.
