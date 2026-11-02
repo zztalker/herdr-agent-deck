@@ -27,7 +27,8 @@ Herdr's main window rebuilt to show what every agent is doing on every machine. 
   - **Under the row**, up to 4 lines (11.5px) per kind, then `+N more`:
     - its agents' chat names, each with a status dot;
     - its shells/programs: program icon, program name, and the folder (or the program's own title while busy, unless that is a path, a prompt or just the terminal id).
-- **Agents** (the other half, min 90px): grouped by space, or by priority (Needs you / Done / Working / Idle) with the sort menu. Each agent is a card (8px radius, `surface` background, `border`; focused: `selected` background and `accent` border):
+- **Divider:** a 12px gap with a 2px `dim` line (the layout's `divider` on `sidebar-lists`); drag it to resize.
+- **Agents** (the other half, min 90px). Its header `Agents ⌄` rolls Spaces up (`layout.toggle {id: "spaces"}`); `Agents ›` shows it again. On the rail the same chevron sits above the list. Grouped by space, or by priority (Needs you / Done / Working / Idle) with the sort menu. Each agent is a card (8px radius, `surface` background, `border`; focused: `selected` background and `accent` border):
   - **Line 1:** program icon, chat name (semibold), the fold chevron with sub-agent count, time in state (a pin on hover), status mark.
   - **Line 2:** chips `@machine` (`@local` here) and the space name.
 - **Agents footer** (28px): a layers icon (Overview) on the left. On the rail it is 52px and stacks the layers icon over Herdr's `»` (widen the sidebar).
@@ -122,6 +123,7 @@ Runs programs and reads files:
 - **Alerts:** Herdr draws its agent alerts with the shipped `toast` mod: the program name and status as the title, `space / tab` below it. Edits to a shipped mod are reverted at the next start, so the chat name reaches the alert through the tab name (`tab.rename {id, name}`). Remember which names this mod set (`localStorage`), and only rename tabs that are unnamed (`named` false) or still carry the name it set, so a person's name is never overwritten.
 - **IDs:** a `HoverCard` needs a stable id per row, and its trigger and content are slots, not children.
 - **`close`:** don't name a View method `close`: Herdr calls a View's `close(cx)` itself when an overlay goes.
+- **Divider:** Herdr drags anywhere in a row/column's `gap`, but its resize cursor shows only over the drawn `divider` line. A wide divider fixes the cursor and looks heavy; this layout keeps a thin line. Mods can't draw in the gap, so the line is the only grab cue. Drop the Agents mod's own top border, or it doubles the line.
 - **Base:** `agent-deck-spaces` is based on the shipped `spaces` of Herdr 0.1.11 (drag-reorder with a drop line and a same-machine guard). When a later Herdr changes that mod, re-apply the `agent-deck:` changes to the new one.
 - **Wrapped cards:** `flex_1().min_w(N)` in a `flex_wrap()` row gives full-width cards that pair up once the lane is wide enough.
 
@@ -133,5 +135,6 @@ Runs programs and reads files:
 - With the sidebar dragged under 160px, resting on an agent number shows its card to the right within about ¼ second; clicking it focuses the agent.
 - A terminal started with `hc run --bg` outside Herdr (in no space) shows on its machine lane as `hidden`; clicking it peeks.
 - An unnamed tab with a Claude Code agent whose chat is called `Fix login` is called `Fix login` within 3 seconds, and when that agent needs you the alert's second line reads `<space> / Fix login`. A tab you renamed yourself keeps your name.
+- Clicking `Agents` hides Spaces and gives Agents the height; clicking it again brings Spaces back at the size it had.
 - `⌘⇧O` opens the Overview and pressing it again closes it; with a remote machine added, its lane and strip chip show its `hc` version.
 - `herdr-app check` passes for all three mods.

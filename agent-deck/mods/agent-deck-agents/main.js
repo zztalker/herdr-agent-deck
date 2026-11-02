@@ -28,6 +28,10 @@ function toggleSidebar() {
   run("layout.resize", { id: "sidebar", px: narrow() ? (shared("sidebar.width") ?? 268) : window()?.platform === "macos" ? 76 : 44 });
 }
 
+// agent-deck: Spaces rolls up into the line above Agents; clicking the Agents header unrolls it.
+const spacesHidden = () => !!find(layout(), "spaces")?.hidden;
+const toggleSpaces = () => run("layout.toggle", { id: "spaces" });
+
 const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
 
 function lead(tab, all = panes()) {
@@ -449,8 +453,7 @@ export default class Agents extends View {
       .size_full()
       .min_h(0)
       .bg(t.chrome)
-      .border_t(1)
-      .border_color(t.border)
+      // agent-deck: the layout's divider above is the line (and the grab handle), so no top border.
       .text_size(13)
       .when(!collapsed, (el) =>
         el.child(
@@ -462,7 +465,21 @@ export default class Agents extends View {
             .flex_none()
             .items_center()
             .justify_between()
-            .child(div().text_size(11.5).font_medium().text_color(t.dim).child("Agents"))
+            // agent-deck: the header rolls Spaces up or down.
+            .child(
+              h_flex()
+                .id("ag-spaces-fold")
+                .flex_1()
+                .gap(4)
+                .items_center()
+                .cursor_pointer()
+                .text_color(t.dim)
+                .hover((s) => s.text_color(t.foreground))
+                .on_click(toggleSpaces)
+                .tooltip(spacesHidden() ? "Show Spaces" : "Roll up Spaces")
+                .child(div().text_size(11.5).font_medium().child("Agents"))
+                .child(svg(`mods/workspace-chrome/chevron-${spacesHidden() ? "right" : "down"}.svg`).size(12)),
+            )
             .child(
               div()
                 .id("ag-sort")
@@ -477,6 +494,23 @@ export default class Agents extends View {
       )
       .when(list.length === 0 && !collapsed, (el) =>
         el.child(div().px(12).text_size(12).text_color(t.dim).child("No agent status yet. Agents show up here when they report their status. Older versions and agents inside tmux may not.")),
+      )
+      // agent-deck: on the rail, the same toggle sits above the list.
+      .when(collapsed, (el) =>
+        el.child(
+          h_flex()
+            .id("ag-spaces-fold")
+            .h(20)
+            .flex_none()
+            .justify_center()
+            .items_center()
+            .cursor_pointer()
+            .text_color(t.dim)
+            .hover((s) => s.text_color(t.foreground))
+            .on_click(toggleSpaces)
+            .tooltip(spacesHidden() ? "Show Spaces" : "Roll up Spaces")
+            .child(svg(`mods/workspace-chrome/chevron-${spacesHidden() ? "right" : "down"}.svg`).size(12)),
+        ),
       )
       .child(v_flex().id("ag-list").flex_1().min_h(0).px(collapsed ? 0 : 8).overflow_y_scrollbar().mode("always").children(rows))
       .child(

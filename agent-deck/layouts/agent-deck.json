@@ -58,7 +58,12 @@
               },
               "min": 90
             }
-          ]
+          ],
+          "gap": 12,
+          "divider": {
+            "width": 2,
+            "color": "dim"
+          }
         },
         {
           "id": "sidebar-footer",
