@@ -4,11 +4,11 @@ A [Herdr](https://herdr.dev) layout: [`agent-deck`](agent-deck/RECIPE.md).
 
 It shows every agent and terminal on every machine. Space rows list their chats, shells and running programs. Agents are cards, and hover cards work on the narrow rail. An Overview board (`⌘⇧O`) has one lane per agent state and one lane per machine for terminals, with each terminal's command and last output lines.
 
-![Overview: agents](agent-deck/overview-agents.png)
+![Overview: agents](agent-deck/preview.png)
 
 | Main window | Overview: terminals |
 | --- | --- |
-| ![Agent Deck](agent-deck/preview.png) | ![Terminals](agent-deck/overview-terminals.png) |
+| ![Main window](agent-deck/main-window.png) | ![Terminals](agent-deck/overview-terminals.png) |
 
 ## Install
 

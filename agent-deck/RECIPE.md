@@ -2,7 +2,9 @@
 
 Herdr's main window rebuilt to show what every agent is doing on every machine. Spaces say what's inside them: chat names, status counts, open shells and running programs. Agents are two-line cards. On the narrow rail, resting the pointer on a row shows its wide card. A full-window Overview (`⌘⇧O`) lays out every agent as a board with one lane per state, and every terminal on every machine with its command and last output lines.
 
-![Agent Deck](preview.png)
+![Overview: agents](preview.png)
+
+![Main window](main-window.png)
 
 ## What you see
 
