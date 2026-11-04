@@ -105,6 +105,12 @@ export default class Overview extends View {
     if (id) closeOverlay(id);
   }
 
+  // A shell on machine `m` (null: this computer), in a new space there (its home).
+  newTerminal(m) {
+    run("space.new", { machine: m ?? "" });
+    this.dismiss();
+  }
+
   clearFilter(cx) {
     this.query = "";
     this.input.set_value("");
@@ -255,7 +261,13 @@ export default class Overview extends View {
         .child(h_flex().h(36).flex_none().px(12).gap(8).items_center().border_b(2).border_color(connected ? t.ansi2 : t.border)
           .child(svg(`mods/workspace-chrome/${m ? "server" : "monitor"}.svg`).size(13).flex_none().text_color(t.muted))
           .child(div().flex_shrink_1().min_w(0).truncate().font_semibold().text_color(t.foreground).child(m ?? "This computer"))
-          .child(div().flex_none().text_size(11).text_color(t.dim).child([`${list.length}`, busyN && `${busyN} running`, hidden && `${hidden} hidden`].filter(Boolean).join(" · "))))
+          .child(div().flex_none().text_size(11).text_color(t.dim).child([`${list.length}`, busyN && `${busyN} running`, hidden && `${hidden} hidden`].filter(Boolean).join(" · ")))
+          .child(div().flex_1())
+          .when(connected, (el) => el.child(div().id(`ov-tnew-${m ?? "local"}`).flex_none().p(3).rounded(4).text_color(t.dim).cursor_pointer()
+            .hover((s) => s.bg(t.hover).text_color(t.foreground))
+            .tooltip(`New space on ${m ?? "this computer"}`)
+            .on_click(() => this.newTerminal(m))
+            .child(svg("mods/workspace-chrome/plus.svg").size(13)))))
         .child(v_flex().id(`ov-tlane-body-${m ?? "local"}`).flex_1().min_h(0).p(8).overflow_y_scrollbar()
           .when(list.length === 0, (el) => el.child(div().p(4).text_size(12).text_color(t.dim).child(connected ? "No terminals" : (machine?.state ?? "asleep").replace(/_/g, " "))))
           .child(h_flex().flex_wrap().items_start().gap(6).children(list.map((x) => this.term(t, x, inPanes.has(x.address), titles.get(x.address), statusOf.get(x.address), now)))));

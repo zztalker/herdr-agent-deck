@@ -50,7 +50,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
   - inside a lane, agents are grouped by machine (small header, count);
   - cards are at least 240px and wrap several to a line;
   - an empty lane shrinks to 150px and says `None`.
-- **Terminals tab:** one lane per machine. The header shows the count, `N running` and `N hidden`; the underline is `ansi2` when connected. Cards are at least 260px. Each card shows:
+- **Terminals tab:** one lane per machine. The header shows the count, `N running` and `N hidden`, and on a connected machine a `+` at the right (tooltip `New space on <machine>`); the underline is `ansi2` when connected. Cards are at least 260px. Each card shows:
   - the program icon;
   - the command as typed (`make test`), `zsh` for an idle shell, or the chat name for an agent;
   - a state word: `running` (accent), `idle`, or the agent's status;
@@ -72,7 +72,8 @@ The cards use `popover` background, `border` and `shadow_lg`.
 - Overview:
   - an agent card runs `agent.focus` and closes the Overview;
   - a terminal card in a pane runs `pane.focus`;
-  - a hidden terminal (in no space) runs `terminal.peek`.
+  - a hidden terminal (in no space) runs `terminal.peek`;
+  - a Terminals lane's `+` runs `space.new {machine}` (empty for this computer): a new space with a shell in that machine's home. Then the Overview closes.
 
 **Filter:** typing goes to the filter box as the Overview opens. Every word must appear on a card (any case), or the card is hidden:
 - an agent: chat name, program, state word, space, tab, machine (`local` for this computer);
@@ -140,6 +141,7 @@ Runs programs and reads files:
 - `make test` running in a shell shows `1 shell · 1 busy` on the space and a `make test` card marked `running` with its last 2 output lines under Terminals.
 - With the sidebar dragged under 160px, resting on an agent number shows its card to the right within about ¼ second; clicking it focuses the agent.
 - A terminal started with `hc run --bg` outside Herdr (in no space) shows on its machine lane as `hidden`; clicking it peeks.
+- Clicking `+` on the ai-ws lane under Terminals closes the Overview and opens a new space on ai-ws with a shell in `/root`.
 - An unnamed tab with a Claude Code agent whose chat is called `Fix login` is called `Fix login` within 3 seconds, and when that agent needs you the alert's second line reads `<space> / Fix login`. A tab you renamed yourself keeps your name.
 - Clicking `Agents` hides Spaces and gives Agents the height; clicking it again brings Spaces back at the size it had.
 - Typing `ai-ws done` in the Overview leaves only finished agents on ai-ws, and the tab reads `Agents 1/9`; `Esc` brings the rest back.
