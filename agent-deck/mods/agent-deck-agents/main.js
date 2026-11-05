@@ -56,20 +56,26 @@ function chatTitle(a) {
   return telling ? (live.length > TAB_NAME_MAX ? live.slice(0, TAB_NAME_MAX - 1) + "\u2026" : live) : null;
 }
 
-const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
+// agent-deck: "waiting" is an idle agent whose own hook still reports background work as
+// a `bg` record (`hc report state=working:id=bg`, e.g. Claude Code's run_in_background
+// shells). A done agent stays done until seen; then, still working in the background, it waits.
+const RANK = { blocked: 5, done: 4, working: 3, waiting: 2, idle: 1 };
+const waits = (s, k) => s === "idle" && bgRunning(k);
+const bgRunning = (k) => k?.records?.bg?.state === "working";
 // A sub-agent without a pane isn't in agents(): its raw word, error counting as
 // blocked. It's never done: it reports to its parent, and the parent's done is the news.
 const kidStatus = (k, listed) => {
   const s = listed.get(k.address) ?? k.status;
-  return s === "error" ? "blocked" : s === "done" ? "idle" : s;
+  const word = s === "error" ? "blocked" : s === "done" ? "idle" : s;
+  return waits(word, k) ? "waiting" : word; // agent-deck: by the word it shows
 };
 const SORTS = [
   { id: "priority", label: "Priority", icon: "clock" },
   { id: "grouped", label: "Grouped by space", icon: "layers" },
 ];
 const sortOf = () => SORTS.find((s) => s.id === shared("agents.sort")) ?? SORTS[0];
-const SECTION = { 4: "Needs you", 3: "Done", 2: "Working", 1: "Idle" };
-const SECTION_STATUS = { 4: "blocked", 3: "done", 2: "working" };
+const SECTION = { 5: "Needs you", 4: "Done", 3: "Working", 2: "Waiting", 1: "Idle" };
+const SECTION_STATUS = { 5: "blocked", 4: "done", 3: "working", 2: "waiting" };
 
 function duration(ms) {
   const m = Math.floor(ms / 60000);
@@ -161,11 +167,12 @@ export default class Agents extends View {
     const cur = list.find((a) => a.focused);
     const same = cur && cur.address === this.held?.address;
     // Arriving, or any change but done turning idle, sets what it was.
-    if (!same || cur.status !== "idle") this.held = cur ? { address: cur.address, rank: RANK[cur.status] ?? 0 } : null;
+    // agent-deck: a seen done agent with background work turns waiting, not idle.
+    if (!same || !(cur.status === "idle" || cur.status === "waiting")) this.held = cur ? { address: cur.address, rank: RANK[cur.status] ?? 0 } : null;
   }
 
   rank(a) {
-    const sawDone = a.address === this.held?.address && this.held.rank === RANK.done && a.status === "idle";
+    const sawDone = a.address === this.held?.address && this.held.rank === RANK.done && (a.status === "idle" || a.status === "waiting");
     return sawDone ? RANK.done : RANK[a.status] ?? 0;
   }
 
@@ -241,6 +248,8 @@ export default class Agents extends View {
   status(t, a, compact = false) {
     const color = t[a.status] ?? t.dim;
     if (a.status === "working") return svg("mods/workspace-chrome/spinner.svg").size(12).mx(1).flex_none().text_color(t.working).spin(900);
+    // agent-deck: waiting spins slower, in its own color (theme "waiting", else muted).
+    if (a.status === "waiting") return svg("mods/workspace-chrome/spinner.svg").size(12).mx(1).flex_none().text_color(t.waiting ?? t.muted ?? t.dim).spin(2400);
     if (a.status === "blocked" && compact) return div().size(14).flex_none().rounded(4).bg(t.blocked + "26").text_size(10.5).font_bold().text_color(t.blocked).flex().items_center().justify_center().child("!");
     if (a.status === "blocked") return div().flex_none().px(6).h(18).rounded(5).bg(t.blocked + "26").text_size(10.5).font_semibold().text_color(t.blocked).flex().items_center().child("Needs you");
     // Idle: a ring; done: a dot.
@@ -253,9 +262,11 @@ export default class Agents extends View {
     if (props()?.sortMenu) return this.sortMenu(t);
     const collapsed = narrow();
     const sort = sortOf();
-    let list = agents();
-    this.listed = new Map(list.map((a) => [a.address, a.status]));
     const all = terminals();
+    // agent-deck: agents at rest with background work show as waiting.
+    const byAddress = new Map(all.map((k) => [k.address, k]));
+    let list = agents().map((a) => (waits(a.status, byAddress.get(a.address)) ? { ...a, status: "waiting" } : a));
+    this.listed = new Map(list.map((a) => [a.address, a.status]));
     const shown = focused()?.agent;
     const now = Date.now();
     this.track(list, now);

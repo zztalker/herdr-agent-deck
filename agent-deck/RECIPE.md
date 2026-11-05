@@ -28,7 +28,7 @@ Herdr's main window rebuilt to show what every agent is doing on every machine. 
     - its agents' chat names, each with a status dot;
     - its shells/programs: program icon, program name, and the folder (or the program's own title while busy, unless that is a path, a prompt or just the terminal id).
 - **Divider:** a 12px gap with a 2px `dim` line (the layout's `divider` on `sidebar-lists`); drag it to resize.
-- **Agents** (the other half, min 90px). Its header `Agents ⌄` rolls Spaces up (`layout.toggle {id: "spaces"}`); `Agents ›` shows it again. On the rail the same chevron sits above the list. Grouped by space, or by priority (Needs you / Done / Working / Idle) with the sort menu. Each agent is a card (8px radius, `surface` background, `border`; focused: `selected` background and `accent` border):
+- **Agents** (the other half, min 90px). Its header `Agents ⌄` rolls Spaces up (`layout.toggle {id: "spaces"}`); `Agents ›` shows it again. On the rail the same chevron sits above the list. Grouped by space, or by priority (Needs you / Done / Working / Waiting / Idle) with the sort menu. Each agent is a card (8px radius, `surface` background, `border`; focused: `selected` background and `accent` border):
   - **Line 1:** program icon, chat name (semibold), the fold chevron with sub-agent count, time in state (a pin on hover), status mark.
   - **Line 2:** chips `@machine` (`@local` here) and the space name.
 - **Agents footer** (28px): a layers icon (Overview) on the left. On the rail it is 52px and stacks the layers icon over Herdr's `»` (widen the sidebar).
@@ -47,6 +47,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
 - **Machine strip:** one chip per machine with a connection dot, `N agents · N terms`; the tooltip shows the state, `hc` version and hidden terminals.
 - **Agents tab:** four lanes, left to right:
   - **Working** (`working` color), **Needs you** (`blocked`), **Done** (`done`) and **Idle** (`idle`), each with a 2px colored underline and a count;
+  - the Working lane also holds **waiting** agents (state word and pill in `muted`), after the busy ones;
   - inside a lane, agents are grouped by machine (small header, count);
   - cards are at least 240px and wrap several to a line;
   - an empty lane shrinks to 150px and says `None`.
@@ -64,6 +65,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
 - **blocked:** red: `needs you`, `!` in priority view, a red card border in the Overview.
 - **done:** blue, until you look at it; then it is idle.
 - **idle:** a grey ring or dot, with dimmed names.
+- **waiting:** an `idle` agent whose 7501 record `bg` is `working`: a slow grey spinner (2.4 s a turn) in its own Waiting section, and in the Overview's Working lane. A `done` agent stays done until you look at it, whatever its records say. The `bg` record comes from a hook, such as the Claude Code hook in [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) (needs an hc with `hc report`, [herdrdev/herdr-core#81](https://github.com/herdrdev/herdr-core/pull/81)). Without it no agent waits and nothing changes.
 
 **Clicks:**
 - An agent card or row focuses its pane.
@@ -100,7 +102,8 @@ While it has text, the tabs read `Agents 3/9`, the pills count only what matches
   - `label()`, which prefers the agent's own title (its chat name) when it is not a path, prompt or the program name;
   - the card row;
   - `HoverCard` (from `gpui-base`) around the rail row;
-  - the footer button `run("mod.open", { name: "agent-deck-overview" })`.
+  - the footer button `run("mod.open", { name: "agent-deck-overview" })`;
+  - the Waiting state: `waits(status, terminal)` (`idle` and `terminal.records.bg.state === "working"`), applied in `render` with `terminals()` indexed by address and in `kidStatus`; `hold` / `rank` treat `waiting` like `idle`.
 - **`mods/agent-deck-spaces`:** modified from the shipped `spaces` mod. It adds:
   - helpers `chatName`, `counts`, `shellsIn` (terminal panes with no status that aren't agents), `busy` (not a shell) and `progIcon`;
   - the machine header badges;
@@ -110,6 +113,7 @@ While it has text, the tabs read `Agents 3/9`, the pills count only what matches
   - It reads `agents()`, `spaces()` (tab `working_since` / `changed_at` for time in state), `terminals()` (`foreground.argv`, `foreground.cwd`, `labels.where`, `created_ms`, `report.msg`) and `panes()`.
   - It runs `hc machine ls --json` and `hc read <address>`.
   - It uses `nextCommand()` for the tab commands, and `InputState` / `Input` (from `gpui-base`) for the filter.
+  - It applies the same `waits` rule to `agents()` and puts waiting agents in the Working lane.
 - **`keys.json`:** `global` → `cmd-shift-o`.
 - **Shipped mods used as-is:** `workspace-chrome` (also its SVG icons: server, monitor, layers, x, plus, chevron-down/right, pin, pin-off, branch, spinner, clock, check), `tabs`, `pane`, `files`, `changes`, `workspace-status`.
 
@@ -138,6 +142,7 @@ Runs programs and reads files:
 
 - Two Claude Code agents in one space show their chat names under the space row, with status counts on it.
 - A blocked agent turns its space count red, lands in the Needs you lane and has a red card border in the Overview.
+- On an idle agent `t5`, `hc report state=working:id=bg --terminal t5` moves it to Waiting in the sidebar and into the Overview's Working lane (`waiting`); `state=clear:id=bg` moves it back to Idle. On an unseen done agent, the same report leaves it in Done.
 - `make test` running in a shell shows `1 shell · 1 busy` on the space and a `make test` card marked `running` with its last 2 output lines under Terminals.
 - With the sidebar dragged under 160px, resting on an agent number shows its card to the right within about ¼ second; clicking it focuses the agent.
 - A terminal started with `hc run --bg` outside Herdr (in no space) shows on its machine lane as `hidden`; clicking it peeks.

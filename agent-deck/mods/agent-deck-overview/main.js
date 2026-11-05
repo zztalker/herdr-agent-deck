@@ -6,9 +6,14 @@ import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { spaces, agents, terminals, panes, run, hc, theme, props, closeOverlay, settings, nextCommand } from "herdr";
 
-const ORDER = ["blocked", "done", "working", "idle"];
-const RANK = { blocked: 4, done: 3, working: 2, idle: 1 };
-const WORD = { blocked: "needs you", done: "done", working: "working", idle: "idle" };
+const ORDER = ["blocked", "done", "working", "waiting", "idle"];
+const RANK = { blocked: 5, done: 4, working: 3, waiting: 2, idle: 1 };
+const WORD = { blocked: "needs you", done: "done", working: "working", waiting: "waiting", idle: "idle" };
+// agent-deck: "waiting" is an idle agent whose own hook still reports background work as
+// a `bg` record (`hc report state=working:id=bg`). Shown in Working; done stays done.
+const waits = (s, k) => s === "idle" && bgRunning(k);
+const bgRunning = (k) => k?.records?.bg?.state === "working";
+const stateColor = (t, s) => (s === "waiting" ? t.waiting ?? t.muted ?? t.dim : t[s] ?? t.dim);
 const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
 // The agent's own title (Claude's chat name) when it says something, else its program.
 function chatName(a) {
@@ -119,12 +124,12 @@ export default class Overview extends View {
   }
 
   pills(t, list) {
-    return counts(list).map(([k, n]) => div().flex_none().px(6).py(1).rounded(4).bg(t[k] + "26").text_size(11).text_color(t[k] ?? t.dim).child(`${n} ${WORD[k]}`));
+    return counts(list).map(([k, n]) => div().flex_none().px(6).py(1).rounded(4).bg(stateColor(t, k) + "26").text_size(11).text_color(stateColor(t, k)).child(`${n} ${WORD[k]}`));
   }
 
   card(t, a, tab, now) {
     const since = a.status === "working" ? tab?.working_since : tab?.changed_at;
-    const color = t[a.status] ?? t.dim;
+    const color = stateColor(t, a.status);
     return v_flex()
       .id(`ov-${a.address}`)
       .flex_1()
@@ -197,11 +202,12 @@ export default class Overview extends View {
   render(cx) {
     const t = theme();
     const now = Date.now();
-    const all = agents();
+    const live = terminals().filter((x) => x.state === "live");
+    const byAddress = new Map(live.map((x) => [x.address, x]));
+    const all = agents().map((a) => (waits(a.status, byAddress.get(a.address)) ? { ...a, status: "waiting" } : a));
     const sp = spaces();
     const tabs = new Map(sp.flatMap((s) => s.tabs).map((x) => [x.id, x]));
     const inPanes = new Set(panes().map((p) => p.terminal).filter(Boolean));
-    const live = terminals().filter((x) => x.state === "live");
     const names = [null, ...[...new Set([...sp.map((s) => s.machine).filter(Boolean), ...this.machines.map((m) => m.name)])].sort()];
 
     const spaceOf = new Map(sp.map((s) => [s.id, s]));
@@ -227,8 +233,9 @@ export default class Overview extends View {
     // A lane per state, in this order; inside, agents grouped by machine.
     const LANES = ["working", "blocked", "done", "idle"];
     const lane = (k) => {
-      const list = shownAgents.filter((a) => a.status === k);
-      const groups = names.map((m) => [m, list.filter((a) => machineOfAgent(a) === m).sort((x, y) => y.seq - x.seq)]).filter(([, g]) => g.length);
+      // agent-deck: the Working lane holds waiting agents too, busy ones first.
+      const list = shownAgents.filter((a) => a.status === k || (k === "working" && a.status === "waiting"));
+      const groups = names.map((m) => [m, list.filter((a) => machineOfAgent(a) === m).sort((x, y) => (RANK[y.status] ?? 0) - (RANK[x.status] ?? 0) || y.seq - x.seq)]).filter(([, g]) => g.length);
       // An empty lane keeps a narrow column; the others share the rest.
       return v_flex().id(`ov-lane-${k}`).when(list.length > 0, (el) => el.flex_1().min_w(0)).when(list.length === 0, (el) => el.w(150).flex_none()).min_h(0).rounded(10).bg(t.chrome).border(1).border_color(t.border)
         .child(h_flex().h(36).flex_none().px(12).gap(8).items_center().border_b(2).border_color(t[k] ?? t.border)
