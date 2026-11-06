@@ -36,3 +36,15 @@ export function taskCounts(terminals) {
   }
   return { tasks: [...n].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)), none };
 }
+
+// The task filter as stored in localStorage (JSON: null, NO_TASK or the task), and back.
+// Anything unreadable comes back as null: all tasks.
+export const saveTaskFilter = (filter) => JSON.stringify(filter ?? null);
+export function loadTaskFilter(stored) {
+  try {
+    const v = JSON.parse(stored);
+    return typeof v === "string" && v !== "" ? v : null;
+  } catch {
+    return null;
+  }
+}

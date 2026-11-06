@@ -530,17 +530,34 @@ export default class Agents extends View {
           .px(12)
           .items_center()
           .justify_between()
-          .when(collapsed, (el) => el.flex_col().h(52).gap(8).justify_center().px(0))
-          // agent-deck: the all-machines overview (cmd-shift-o); again closes it.
+          .when(collapsed, (el) => el.flex_col().h(76).gap(8).justify_center().px(0))
+          // agent-deck: the all-machines overview (cmd-shift-o; again closes it), and History:
+          // search past Claude Code sessions on every machine.
           .child(
-            div()
-              .id("overview")
-              .text_color(t.dim)
-              .cursor_pointer()
-              .hover((s) => s.text_color(t.foreground))
-              .on_click(() => run("mod.open", { name: "agent-deck-overview" }))
-              .tooltip("Agents overview (⌘⇧O)")
-              .child(svg("mods/workspace-chrome/layers.svg").size(14)),
+            h_flex()
+              .gap(12)
+              .items_center()
+              .when(collapsed, (el) => el.flex_col().gap(8))
+              .child(
+                div()
+                  .id("overview")
+                  .text_color(t.dim)
+                  .cursor_pointer()
+                  .hover((s) => s.text_color(t.foreground))
+                  .on_click(() => run("mod.open", { name: "agent-deck-overview" }))
+                  .tooltip("Agents overview (⌘⇧O)")
+                  .child(svg("mods/workspace-chrome/layers.svg").size(14)),
+              )
+              .child(
+                div()
+                  .id("history")
+                  .text_color(t.dim)
+                  .cursor_pointer()
+                  .hover((s) => s.text_color(t.foreground))
+                  .on_click(() => run("mod.open", { name: "agent-deck-history" }))
+                  .tooltip("Search past sessions (History)")
+                  .child(svg("mods/workspace-chrome/search.svg").size(14)),
+              ),
           )
           // Herdr's rail control: only on the rail.
           .when(collapsed, (el) => el.child(

@@ -6,7 +6,8 @@ import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Popup } from "gpui-base";
 import { spaces, agents, terminals, panes, run, hc, theme, props, closeOverlay, openOverlay, settings, nextCommand } from "herdr";
 import { parseUsage, usageArgs } from "./usage.js";
-import { customLabels, taskMatches, taskCounts, NO_TASK } from "./labels.js";
+import { customLabels, taskMatches, taskCounts, NO_TASK, saveTaskFilter, loadTaskFilter } from "./labels.js";
+import { SESSION_OF, sessionFrom, resumeLink, machineOf as machineOfAddress } from "./resume.js";
 
 // agent-deck: edit a terminal's labels in the agent-deck-labels dialog.
 const editLabels = (terminal) => openOverlay({ mod: "agent-deck-labels", kind: "dialog", width: 560, props: { terminal } });
@@ -58,7 +59,8 @@ export default class Overview extends View {
     this.preview = {}; // address -> its last lines
     this.usage = {}; // machine ("" = this computer) -> {cpu, mem, disk} | {loading} | {error}
     this.query = "";
-    this.taskFilter = null; // null: every task; NO_TASK: none; else that task
+    // null: every task; NO_TASK: none; else that task. The last pick is remembered.
+    this.taskFilter = (() => { try { return loadTaskFilter(localStorage.getItem("taskFilter")); } catch { return null; } })();
     this.taskMenu = false;
     this.input = InputState.new({ placeholder: "Filter: name, machine, space, command…" });
     this.input.on("change", (_e, cx) => { this.query = this.input.value(); cx.notify(); });
@@ -74,6 +76,9 @@ export default class Overview extends View {
         if (c === "agents" || c === "terminals") this.show(c, cx);
         if (c === "usage") { this.show("terminals", cx); this.measure(this.machineNames(), cx); }
         if (c === "tasks") { this.taskMenu = !this.taskMenu; cx.notify(); }
+        // `agent-deck-overview.task <name>` filters to that task; `task` alone shows all.
+        if (c === "task") this.setTaskFilter(null, cx);
+        else if (typeof c === "string" && c.startsWith("task ")) this.setTaskFilter(c.slice(5).trim() || null, cx);
         if (c === "label") {
           const a = agents().find((x) => x.focused);
           if (a) editLabels(a.address);
@@ -182,6 +187,48 @@ export default class Overview extends View {
     return counts(list).map(([k, n]) => div().flex_none().px(6).py(1).rounded(4).bg(stateColor(t, k) + "26").text_size(11).text_color(stateColor(t, k)).child(`${n} ${WORD[k]}`));
   }
 
+  setTaskFilter(value, cx) {
+    this.taskFilter = value;
+    this.taskMenu = false;
+    try { localStorage.setItem("taskFilter", saveTaskFilter(value)); } catch {}
+    cx.notify();
+  }
+
+  // agent-deck: Copy link on a Claude Code card: a herdr-resume:// link to its session
+  // (resume.js). The session id is read on click: the pid of the terminal's program, then
+  // ~/.claude/sessions/<pid>.json on its machine. The icon says how it went for 2 s.
+  copyLink(address, cx) {
+    if (this.linkState?.address === address && this.linkState.state === "busy") return;
+    const mark = (state, cx) => { this.linkState = { address, state }; cx.notify(); };
+    mark("busy", cx);
+    cx.spawn(async (cx) => {
+      let id = null;
+      try {
+        let pid = terminals().find((x) => x.address === address)?.foreground?.pid;
+        if (!Number.isInteger(pid)) pid = JSON.parse((await hc(["get", address, "--json"])).stdout)?.foreground?.pid;
+        const m = machineOfAddress(address);
+        if (Number.isInteger(pid)) {
+          const r = await hc(["exec", ...(m ? ["--on", m] : []), "--timeout", "20", "--", "sh", "-c", SESSION_OF, "sh", String(pid)]);
+          id = sessionFrom(r.stdout, pid);
+        }
+        if (id) cx.write_to_clipboard(resumeLink(m, id));
+      } catch {}
+      const state = id ? "copied" : "failed";
+      mark(state, cx);
+      cx.timer.after(2000, (cx) => { if (this.linkState?.address === address && this.linkState.state === state) { this.linkState = null; cx.notify(); } });
+    });
+  }
+
+  linkButton(t, address) {
+    const st = this.linkState?.address === address ? this.linkState.state : null;
+    return div().id(`ov-link-${address}`).flex_none().p(2).rounded(4).cursor_pointer()
+      .text_color(st === "copied" ? t.ansi2 ?? t.foreground : st === "failed" ? t.blocked : t.dim)
+      .hover((s) => s.bg(t.hover).text_color(t.foreground))
+      .tooltip(st === "copied" ? "Link copied" : st === "failed" ? "No session to link yet (send it a message first)" : "Copy a herdr-resume:// link to this session")
+      .on_click((_e, cx) => { cx.stop_propagation(); this.copyLink(address, cx); })
+      .child(svg("mods/agent-deck-overview/link.svg").size(12));
+  }
+
   // agent-deck: the tag on an agent card opens the label editor (the agent-deck-labels mod).
   tagButton(t, address) {
     return div().id(`ov-tag-${address}`).flex_none().p(2).rounded(4).text_color(t.dim).cursor_pointer()
@@ -210,7 +257,7 @@ export default class Overview extends View {
     const option = (id, value, label, n) => h_flex().id(`ov-task-opt-${id}`).px(8).py(4).gap(8).items_center().rounded(5).cursor_pointer()
       .when(f === value, (el) => el.bg(t.selected))
       .hover((s) => s.bg(t.hover))
-      .on_click((_e, cx) => { cx.stop_propagation(); this.taskFilter = value; this.taskMenu = false; cx.notify(); })
+      .on_click((_e, cx) => { cx.stop_propagation(); this.setTaskFilter(value, cx); })
       .child(div().flex_1().min_w(0).truncate().text_color(value === NO_TASK || value === null ? t.dim : t.foreground).child(label))
       .child(div().flex_none().text_color(t.dim).child(String(n)));
     const menu = v_flex().id("ov-task-list").w(280).max_h(360).overflow_y_scrollbar().p(4).gap(1).rounded(8).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg().text_size(12)
@@ -253,6 +300,7 @@ export default class Overview extends View {
       .child(h_flex().gap(8).items_center().min_w(0)
         .when(Boolean(a.program?.icon), (el) => el.child(icon(a.program, 16, t.foreground)))
         .child(div().flex_1().min_w(0).truncate().font_semibold().text_color(a.status === "idle" ? t.muted : t.foreground).child(chatName(a)))
+        .when(a.program?.key === "claude", (el) => el.child(this.linkButton(t, a.address)))
         .child(this.tagButton(t, a.address))
         .child(div().flex_none().size(8).rounded(4).bg(color)))
       .child(h_flex().gap(6).items_center().min_w(0).text_size(11).text_color(t.dim)
@@ -296,6 +344,7 @@ export default class Overview extends View {
       .child(h_flex().gap(8).items_center().min_w(0)
         .child(g?.icon ? icon(g, 15, t.foreground) : div().flex_none().text_size(11).text_color(t.dim).child(">_"))
         .child(div().flex_1().min_w(0).truncate().font_semibold().text_color(state === "idle" ? t.muted : t.foreground).child(name))
+        .when(g?.key === "claude", (el) => el.child(this.linkButton(t, x.address)))
         .when(Boolean(g?.agent), (el) => el.child(this.tagButton(t, x.address)))
         .child(div().flex_none().text_size(11).text_color(color).child(WORD[state] ?? state)))
       .child(h_flex().gap(6).items_center().min_w(0).text_size(11).text_color(t.dim)

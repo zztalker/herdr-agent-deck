@@ -4,7 +4,20 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 
 ## 2026-11-06
 
+History search and resume links follow the design of Martin Krcho's Herdr setup ([GitHub](https://github.com/martinkrcho) · [LinkedIn](https://www.linkedin.com/in/martinkrcho/)): an index of Claude Code transcripts kept on each machine, `claude --resume` to reopen, and the `herdr-resume://<machine>/<session-id>` link format, so links work with either handler. Thank you, Martin. The code here is agent-deck's own implementation.
+
 ### Added
+- **History** (new `agent-deck-history` mod): a dialog that searches past Claude Code sessions on every connected machine, opened from a search icon beside the Overview icon in the Agents footer (or `mod.open:agent-deck-history`).
+  - An empty box shows Recent (the last 8, without the ones running now); typing matches every word in the title (a `/rename` wins over Claude's own), folder or machine (`local` for this computer), newest first, up to 50, running ones marked `running`.
+  - A pasted `herdr-resume://` link or a bare session id finds that one session.
+  - ↑ / ↓ and Enter, or a click: a running session comes to the front; any other reopens with `claude --resume <id>` in a new tab on its machine (in a space in the same folder first), in the nearest folder that still exists.
+  - Each machine keeps `~/.cache/agent-deck-history/index.tsv`: only new or changed transcripts are read again (the first scan of a busy machine took 3–14 s here, later ones ~0.15 s), and a scan cut short keeps what it read. Headless Agent SDK runs are left out.
+- **Full text** in History: a check button beside the search box (remembered, or `agent-deck-history.full`) searches inside the conversations too. Each machine greps its titled sessions' transcripts for the typed text, literally and in any case (`grep -F -i`, at least 3 characters, after a 0.4 s pause), and each card gets a third line: the first matching conversation line, shortened to the words around the match, with the match picked out. Only user and assistant lines count (tool output included): the instructions injected into every session and the raw API-request copies are skipped, so a word from your CLAUDE.md doesn't match every session. Here: about 0.2 s per VM, 5 s on a Mac with a 987 MB transcript.
+- `agent-deck-history.search <text>` types a search into the open History dialog.
+- **The Overview remembers the task filter:** the last pick in the `Task ▾` menu applies the next time the Overview opens. `agent-deck-overview.task <name>` picks a task (`task` alone: all).
+- **Resume links:** `Copy link` on History rows and a link icon on Claude Code cards in the Overview copy a `herdr-resume://<machine|local>/<session-id>` link. A running card's id is read on click from `~/.claude/sessions/<pid>.json` on its machine (no link before the first message).
+- **`resume-link/`** (macOS): `install.sh` builds `~/Applications/Agent Deck Resume Link.app`, which opens `herdr-resume://` links: it brings the session to the front if it runs, else reopens it as History does. Log: `~/Library/Logs/agent-deck-resume.log`. Python 3, standard library only; tests in `test_agent_deck_resume.py`.
+- Tests: `agent-deck-history/history.test.mjs` (runs the scan script on a fake home: titles, the index, a scan killed halfway, live sessions) and `agent-deck-overview/resume.test.mjs`.
 - **Labels on cards.** A terminal's own labels (`hc label t7 role=reviewer`) show as `key value` chips on Overview cards, on both tabs. Herdr's own labels (`where`, `herdr.*`) are left out.
 - **Label editor** (new `agent-deck-labels` mod): a dialog with Role and Task fields, `+ Add label` for other `key=value` rows, and Save / Cancel (Enter / Esc). Save runs `hc label` with only what changed; an emptied value removes the label. Keys with spaces or `=`, or starting with `-`, are refused.
   - Suggestions under the field being typed: values from every live terminal on every machine, plus, for tasks and roles, the ones saved before (kept in the mod's localStorage, most recent first, 50 at most).
@@ -20,6 +33,8 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 ### Changed
 - The Overview now also runs `hc exec [--on <machine>] -- sh -c <script>` when Usage is pressed. The script only reads (`/proc/stat`, `/proc/meminfo`, `df` on Linux; `top`, `vm_stat`, `sysctl`, `df` on macOS).
 - The layout now writes labels when you save them in the editor (`hc label`); everything else stays read-only.
+- History runs a read-only scan script on each machine with `hc exec` while its dialog is open; it writes only its own cache, `~/.cache/agent-deck-history/index.tsv`.
+- The Agents footer holds two icons (Overview, History); on the narrow rail it is 76px tall instead of 52px.
 
 ## 2026-11-05
 

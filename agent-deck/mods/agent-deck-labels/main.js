@@ -40,7 +40,7 @@ export default class Labels extends View {
   row(key, value, fixed) {
     const r = { key, fixed };
     r.k = fixed ? null : InputState.new({ placeholder: "key", value: key });
-    r.v = InputState.new({ placeholder: key === "task" ? "e.g. DEF-1234" : key === "role" ? "e.g. reviewer" : "value", value });
+    r.v = InputState.new({ placeholder: key === "task" ? "e.g. PROJ-1234" : key === "role" ? "e.g. reviewer" : "value", value });
     for (const s of [r.k, r.v].filter(Boolean)) {
       s.on("change", (_e, cx) => cx.notify());
       s.on("submit", (_e, cx) => this.save(cx));

@@ -35,8 +35,8 @@ test("hc args: local runs without --on, a machine with it; always argv through s
   const local = usageArgs(null);
   assert.deepEqual(local.slice(0, 1), ["exec"]);
   assert.ok(!local.includes("--on"));
-  const remote = usageArgs("ai-ws");
-  assert.deepEqual(remote.slice(0, 3), ["exec", "--on", "ai-ws"]);
+  const remote = usageArgs("devbox");
+  assert.deepEqual(remote.slice(0, 3), ["exec", "--on", "devbox"]);
   for (const a of [local, remote]) assert.deepEqual(a.slice(-4), ["--", "sh", "-c", USAGE_SCRIPT]);
 });
 
