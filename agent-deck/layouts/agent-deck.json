@@ -95,7 +95,7 @@
           "id": "tabs",
           "type": "block",
           "content": {
-            "mod": "tabs"
+            "mod": "agent-deck-tabs"
           },
           "size": {
             "px": 42

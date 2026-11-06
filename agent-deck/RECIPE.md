@@ -40,10 +40,17 @@ Herdr's main window rebuilt to show what every agent is doing on every machine. 
 
 The cards use `popover` background, `border` and `shadow_lg`.
 
-**Main area:** the shipped tab bar (42px), panes, a `files`/`changes` panel (368px) and the `workspace-status` bar (28px). These are unchanged from Herdr's main layout.
+**Main area:** the tab bar (42px), panes, a `files`/`changes` panel (368px) and the `workspace-status` bar (28px). These are Herdr's main layout, except that the tab bar is `agent-deck-tabs`: the shipped `tabs` with a 26px tag button left of `+` (Lucide `tag`, 14px, `dim`; `border` color when no terminal is focused). Its tooltip lists the focused terminal's own labels (`Labels: role=lead · task=DEF-1`), or says `Add labels (role, task…)`.
+
+**Label editor** (`agent-deck-labels`): a dialog 560px wide, `popover` background, 16px padding.
+- **Header:** tag icon, `Labels`, then `<chat or program name> · <address>` in `dim`.
+- **Rows:** `Role` and `Task` always (a 64px label, then a 28px field with the `accent` border while focused); then one row per other label the terminal has: a 120px key field, the value field and a `×`.
+- **Suggestions:** under the focused value field, up to 8 clickable chips (11px, `chrome` background, `accent` border on hover).
+- **`+ Add label`** adds a key/value row; an error line (`blocked`) when a key is refused or `hc label` fails.
+- **Footer:** `Enter saves · Esc cancels · an empty value removes the label`, `Cancel` (bordered) and `Save` (`accent` background; `Saving…` while it runs).
 
 **Overview:** a dialog at 85% × 85% of the window.
-- **Title row** (44px): `Overview`, the tab switch `Agents N | Terminals N`, the machine count, a filter box (up to 360px, `search` icon, `accent` border while it has text), status pills (Agents tab only), a bordered `Usage` button (Terminals tab only; `Usage…` while measuring) and a close button.
+- **Title row** (44px): `Overview`, the tab switch `Agents N | Terminals N`, the machine count, a filter box (up to 360px, `search` icon, `accent` border while it has text), a `Task ▾` menu (28px, up to 240px, `accent` border while it filters; the open list is a 280px popup under it, up to 360px tall, with `All tasks`, every task and `No task`, each with its count on the current tab), status pills (Agents tab only), a bordered `Usage` button (Terminals tab only; `Usage…` while measuring) and a close button.
 - **Machine strip:** one chip per machine with a connection dot, `N agents · N terms`; the tooltip shows the state, `hc` version and hidden terminals.
 - **Agents tab:** four lanes, left to right:
   - **Working** (`working` color), **Needs you** (`blocked`), **Done** (`done`) and **Idle** (`idle`), each with a 2px colored underline and a count;
@@ -57,6 +64,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
   - a state word: `running` (accent), `idle`, or the agent's status;
   - the folder, `space / tab` (or `hidden` in `done` color) and its age;
   - the last 2 non-empty screen lines in the terminal font (an agent shows its last report message instead).
+- **Labels on cards (both tabs):** an agent card has a 12px tag icon (`dim`) before its status mark or word. A card whose terminal carries labels of its own (not `where`, not `herdr.*`, not empty) shows them as chips under its second line, sorted by key: `key` in `dim`, the value in `foreground`, 10.5px, `chrome` background, `border`, cut at 200px (tooltip `key=value`), wrapping to more lines.
 
 ## How it behaves
 
@@ -77,17 +85,28 @@ The cards use `popover` background, `border` and `shadow_lg`.
   - a hidden terminal (in no space) runs `terminal.peek`;
   - a Terminals lane's `+` runs `space.new {machine}` (empty for this computer): a new space with a shell in that machine's home. Then the Overview closes.
   - `Usage` measures this computer and every connected machine in parallel; each lane fills in as its answer comes. Pressing it again while a machine is still measuring skips that machine.
+  - a card's tag icon opens the label editor for that agent (it stops the click, so the card doesn't also go to the agent);
+  - `Task ▾` opens its list; picking an entry filters and closes it; clicking `Task ▾` again or `Esc` closes it.
+- The tab bar's tag button opens the label editor for the focused terminal, agent or shell (nothing when no terminal is focused).
+- Label editor:
+  - clicking a suggestion puts it in the field;
+  - `Save` or Enter in any field runs `hc label <address> k=v… k=…` with only what changed (an emptied value or a removed row sends `k=`), remembers the role and task in the mod's localStorage, and closes; nothing changed just closes;
+  - `Cancel` or `Esc` closes without writing.
 
 **Filter:** typing goes to the filter box as the Overview opens. Every word must appear on a card (any case), or the card is hidden:
 - an agent: chat name, program, state word, space, tab, machine (`local` for this computer);
 - a terminal: command, folder, `space / tab` or `hidden`, address, title, last lines, machine.
 
-While it has text, the tabs read `Agents 3/9`, the pills count only what matches and empty lanes say `No match`. The `×` or `Esc` clears it; `Esc` again closes the Overview.
+The task menu filters too: a card shows only if its terminal's `task` label is the picked one (`No task`: it has none). Both filters apply together. While either is on, the tabs read `Agents 3/9`, the pills count only what matches and empty lanes say `No match`. The task filter is not remembered when the Overview closes.
+
+**Suggestions** in the label editor: values of that key from every live terminal on every machine; for `task` and `role` also the values saved before, kept in `agent-deck-labels`' localStorage (`tasks`, `roles`, most recent first, 50 at most), listed first. Matching is anywhere in the value, any case; values starting with what was typed come first; the value already typed is not offered; with nothing typed, the first 8. The `×` or `Esc` clears it; `Esc` again closes the Overview.
 
 **Keys and commands:**
 - `⌘⇧O` (`mod.open:agent-deck-overview`) toggles the Overview; `Esc` closes it.
 - `agent-deck-overview.agents` and `agent-deck-overview.terminals` switch its tab while it's open.
 - `agent-deck-overview.usage` switches to Terminals and measures, like the button.
+- `agent-deck-overview.label` opens the label editor for the focused agent; `agent-deck-overview.tasks` opens or closes the task menu.
+- `mod.open:agent-deck-labels` opens the label editor for the focused terminal (the tab bar button does the same).
 - The tab you used last is remembered.
 
 **Tab names:** a tab holding exactly one agent with a real chat name takes that name, cut to 48 characters. It's checked every 3 seconds and follows the chat if it's renamed. Herdr's own alerts then read `Claude Code needs you`, then `space / <chat name>` instead of `space / 1`. Tabs someone named stay as they are. Clearing a tab's name (an empty `tab.rename`) hands it back. `NAME_TABS = false` at the top of `agent-deck-agents` turns this off.
@@ -99,7 +118,13 @@ While it has text, the tabs read `Agents 3/9`, the pills count only what matches
 
 ## Built from
 
-- **`layouts/agent-deck.json`:** a clone of Herdr's `main` layout with `spaces` → `agent-deck-spaces` and `agents` → `agent-deck-agents`.
+- **`layouts/agent-deck.json`:** a clone of Herdr's `main` layout with `spaces` → `agent-deck-spaces`, `agents` → `agent-deck-agents` and `tabs` → `agent-deck-tabs`.
+- **`mods/agent-deck-tabs`:** `mod.clone` of the shipped `tabs` (Herdr 0.1.13, `cloned_from` in `mod.json`). It adds `labelButton(t, button)`: the tag button before `+`, from `focused().terminal` and that terminal's `labels` in `terminals()`, opening `openOverlay({ mod: "agent-deck-labels", kind: "dialog", width: 560, props: { terminal } })`.
+- **`mods/agent-deck-labels`:** new, `mod.json` overlay `{ kind: "dialog", width: 560 }`.
+  - It edits `props().terminal`, else `focused().terminal`; the name comes from `agents()` / `panes()` titles, else the program.
+  - `edit.js` (no imports, so node can test it): `customLabels` (the starting rows), `knownValues(terminals, key, cache)`, `remember(cache, value, max = 50)`, `suggest(values, typed, limit = 8)` and `labelArgs(before, rows)` (the `hc label` arguments; refuses keys with spaces or `=` or a leading `-`, never touches `where` / `herdr.*`). Tests: `edit.test.mjs`.
+  - It runs `hc label <address> …` on Save, nothing else.
+  - `tag.svg`: Lucide's `tag` icon (ISC), also used by the Overview and the tab bar.
 - **`layouts/agent-deck-preview.png`:** the Settings picture (root `"preview"`): the Overview's Agents tab, 480×300 (1.6:1, the shape Settings cards show).
 - **`mods/agent-deck-agents`:** modified from the shipped `agents` mod. It adds:
   - `label()`, which prefers the agent's own title (its chat name) when it is not a path, prompt or the program name;
@@ -122,14 +147,16 @@ While it has text, the tabs read `Agents 3/9`, the pills count only what matches
     - macOS: CPU `100 − idle` from the second sample of `top -l 2 -n 0 -s 1`; memory (active + wired + compressor pages) × page size / `hw.memsize`.
     - Disk: `df -P "$HOME"`'s capacity: the Data volume on macOS, `/` on a typical VM.
   - `machineNames()`: this computer, then every machine with a space or in `hc machine ls`, sorted; used by `render` and by `measure`.
+  - `labels.js` (no imports): `customLabels` (chips), `taskOf`, `taskMatches(labels, filter)` (`null` all, `NO_TASK` none), `taskCounts(terminals)`. Tests: `labels.test.mjs`. The task menu is a `Popup` (from `gpui-base`) whose content is filled only while it's open. Tag icons call `openOverlay` for `agent-deck-labels`.
 - **`keys.json`:** `global` → `cmd-shift-o`.
-- **Shipped mods used as-is:** `workspace-chrome` (also its SVG icons: server, monitor, layers, x, plus, chevron-down/right, pin, pin-off, branch, spinner, clock, check), `tabs`, `pane`, `files`, `changes`, `workspace-status`.
+- **Shipped mods used as-is:** `workspace-chrome` (also its SVG icons: server, monitor, layers, x, plus, chevron-down/right, pin, pin-off, branch, spinner, clock, check), `pane`, `files`, `changes`, `workspace-status`.
 
 Runs programs and reads files:
 - `hc` (read-only: `machine ls`, `read`).
 - `hc exec` with the Usage script, only when `Usage` is pressed: it reads `/proc/stat`, `/proc/meminfo` and `df` on Linux, `top`, `vm_stat`, `sysctl` and `df` on macOS, and changes nothing.
 - `agent-deck-spaces` keeps Herdr's own git tail from the shipped `spaces` mod. It runs `git` (`rev-parse`, `status`) in each space's folder, on that space's machine for remote spaces, and `watchFolder`s local repos' git folders to refresh on commits.
-- No network, no writes.
+- `hc label <address> …` when Save is pressed in the label editor: the only write.
+- No network.
 
 ## Watch out
 
@@ -149,6 +176,11 @@ Runs programs and reads files:
 - **Usage script:** pass it as argv (`hc exec … -- sh -c <script>`). `hc exec` runs argv with no shell, so the script never reaches the machine's login shell (fish would not parse it).
 - **No detaching under `hc exec`:** everything it started ends with it, `setsid nohup … &` included. Run what must outlive the call in an `hc` terminal instead.
 - **Conditional children:** `.child()` takes no `null`; add an optional row with `.when(cond, el => el.child(…))`.
+- **No imports across mods:** a mod can only import files in its own folder (`../other-mod/x.js` is refused). Shared rules are copied, with a note in each copy. Assets are different: `svg("mods/other-mod/icon.svg")` works from any mod.
+- **Mouse handlers:** `on_mouse_down` / `on_mouse_up` take the button first (`"left"`); without it the mod fails when that element first renders.
+- **`herdr-app check` renders the first frame only:** a dialog or a branch that shows only after a click is not checked. Open it in the window (a command helps) and look at `herdr-app status` and a `shot`.
+- **Clicks inside a card:** GPUI sends a click to every handler under the pointer. A button inside a clickable card calls `cx.stop_propagation()`.
+- **Tabs base:** `agent-deck-tabs` is a clone of the shipped `tabs` of Herdr 0.1.13. Clones are never updated; when a later Herdr changes `tabs`, clone it again and re-add `labelButton`.
 - **Status colors as warnings:** `done` is blue in some themes; use `working` (amber) for "getting full", `blocked` for "full".
 
 ## Done when
@@ -166,4 +198,9 @@ Runs programs and reads files:
 - `⌘⇧O` opens the Overview and pressing it again closes it; with a remote machine added, its lane and strip chip show its `hc` version.
 - Pressing `Usage` on the Terminals tab fills a `CPU · MEM · Disk` row under every connected machine's lane within about 3 seconds, matching `free` / `df` there; a disconnected machine's row says why.
 - `node --test usage.test.mjs` passes in `mods/agent-deck-overview`.
-- `herdr-app check` passes for all three mods.
+- Clicking the tab bar's tag button on a shell opens the editor for that shell; typing `rev` in Role offers `reviewer` if any terminal has it; Save adds `role=reviewer`, and the shell's card in the Overview shows a `role reviewer` chip.
+- Emptying Task and saving removes `task` from `hc get <t>`; Cancel writes nothing.
+- With two agents on `task=DEF-1` and one on `DEF-2`, the task menu lists `DEF-1 2`, `DEF-2 1`; picking `DEF-1` leaves those two on both tabs and the tab reads `Agents 2/N`.
+- Clicking an agent card's tag icon opens the editor and does not go to the agent.
+- `node --test edit.test.mjs` passes in `mods/agent-deck-labels`, and `node --test labels.test.mjs usage.test.mjs` in `mods/agent-deck-overview`.
+- `herdr-app check` passes for all five mods.
