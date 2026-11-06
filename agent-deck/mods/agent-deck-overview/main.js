@@ -5,6 +5,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { spaces, agents, terminals, panes, run, hc, theme, props, closeOverlay, settings, nextCommand } from "herdr";
+import { parseUsage, usageArgs } from "./usage.js";
 
 const ORDER = ["blocked", "done", "working", "waiting", "idle"];
 const RANK = { blocked: 5, done: 4, working: 3, waiting: 2, idle: 1 };
@@ -51,6 +52,7 @@ export default class Overview extends View {
     this.machines = [];
     this.tab = localStorage.getItem("tab") ?? "agents";
     this.preview = {}; // address -> its last lines
+    this.usage = {}; // machine ("" = this computer) -> {cpu, mem, disk} | {loading} | {error}
     this.query = "";
     this.input = InputState.new({ placeholder: "Filter: name, machine, space, command…" });
     this.input.on("change", (_e, cx) => { this.query = this.input.value(); cx.notify(); });
@@ -64,6 +66,7 @@ export default class Overview extends View {
       for (;;) {
         const c = await nextCommand();
         if (c === "agents" || c === "terminals") this.show(c, cx);
+        if (c === "usage") { this.show("terminals", cx); this.measure(this.machineNames(), cx); }
       }
     });
   }
@@ -102,6 +105,47 @@ export default class Overview extends View {
       } catch {}
       cx.notify();
     });
+  }
+
+  // This computer (null) first, then every machine with a space or known to hc.
+  machineNames() {
+    return [null, ...[...new Set([...spaces().map((s) => s.machine).filter(Boolean), ...this.machines.map((m) => m.name)])].sort()];
+  }
+
+  // agent-deck: CPU, memory and disk use of every machine, all at once; each lane shows its own.
+  // Also `agent-deck-overview.usage` (keys can name it).
+  measure(names, cx) {
+    for (const m of names) {
+      const key = m ?? "";
+      if (this.usage[key]?.loading) continue;
+      const machine = this.machines.find((k) => k.name === m);
+      if (m && machine?.state !== "connected") {
+        this.usage[key] = { error: (machine?.state ?? "asleep").replace(/_/g, " ") };
+        continue;
+      }
+      this.usage[key] = { loading: true };
+      cx.spawn(async (cx) => {
+        try {
+          const r = await hc(usageArgs(m));
+          this.usage[key] = (r.code === 0 && parseUsage(r.stdout)) || { error: (r.stderr || r.stdout || `exit ${r.code}`).trim().split("\n").pop() };
+        } catch (e) {
+          this.usage[key] = { error: String(e?.message ?? e) };
+        }
+        cx.notify();
+      });
+    }
+    cx.notify();
+  }
+
+  usageRow(t, m) {
+    const u = this.usage[m ?? ""];
+    const row = h_flex().id(`ov-usage-${m ?? "local"}`).flex_none().h(24).px(12).gap(12).items_center().border_b(1).border_color(t.border).text_size(11).text_color(t.dim);
+    if (u.loading) return row.child("Measuring…");
+    if (u.error) return row.child(div().id(`ov-usage-err-${m ?? "local"}`).flex_1().min_w(0).truncate().tooltip(u.error).child(`Usage: ${u.error}`));
+    const level = (v) => (v >= 90 ? t.blocked : v >= 75 ? t.working : t.foreground);
+    return row.children([["CPU", u.cpu], ["MEM", u.mem], ["Disk", u.disk]].map(([k, v]) => h_flex().gap(4)
+      .child(div().child(k))
+      .child(div().font_semibold().text_color(v === null ? t.dim : level(v)).child(v === null ? "–" : `${v}%`))));
   }
 
   // Not `close`: Herdr calls a View's close(cx) itself when the overlay goes.
@@ -208,7 +252,7 @@ export default class Overview extends View {
     const sp = spaces();
     const tabs = new Map(sp.flatMap((s) => s.tabs).map((x) => [x.id, x]));
     const inPanes = new Set(panes().map((p) => p.terminal).filter(Boolean));
-    const names = [null, ...[...new Set([...sp.map((s) => s.machine).filter(Boolean), ...this.machines.map((m) => m.name)])].sort()];
+    const names = this.machineNames();
 
     const spaceOf = new Map(sp.map((s) => [s.id, s]));
     const machineOfAgent = (a) => spaceOf.get(a.space)?.machine ?? null;
@@ -275,6 +319,7 @@ export default class Overview extends View {
             .tooltip(`New space on ${m ?? "this computer"}`)
             .on_click(() => this.newTerminal(m))
             .child(svg("mods/workspace-chrome/plus.svg").size(13)))))
+        .when(Boolean(this.usage[m ?? ""]), (el) => el.child(this.usageRow(t, m)))
         .child(v_flex().id(`ov-tlane-body-${m ?? "local"}`).flex_1().min_h(0).p(8).overflow_y_scrollbar()
           .when(list.length === 0, (el) => el.child(div().p(4).text_size(12).text_color(t.dim).child(connected ? "No terminals" : (machine?.state ?? "asleep").replace(/_/g, " "))))
           .child(h_flex().flex_wrap().items_start().gap(6).children(list.map((x) => this.term(t, x, inPanes.has(x.address), titles.get(x.address), statusOf.get(x.address), now)))));
@@ -313,6 +358,11 @@ export default class Overview extends View {
             .child(svg("mods/workspace-chrome/x.svg").size(12)))))
         .child(div().flex_1())
         .when(!onTerms, (el) => el.children(this.pills(t, shownAgents)))
+        .when(onTerms, (el) => el.child(div().id("ov-usage").px(10).py(3).rounded(6).border(1).border_color(t.border).text_size(12).text_color(t.dim).cursor_pointer()
+          .hover((s) => s.bg(t.hover).text_color(t.foreground))
+          .tooltip("CPU, memory and disk use of every machine")
+          .on_click((_e, cx) => this.measure(names, cx))
+          .child(Object.values(this.usage).some((u) => u.loading) ? "Usage…" : "Usage")))
         .child(div().id("ov-close").p(4).rounded(4).text_color(t.dim).cursor_pointer()
           .hover((s) => s.bg(t.hover).text_color(t.foreground))
           .on_click(() => this.dismiss())

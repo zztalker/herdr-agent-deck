@@ -2,7 +2,7 @@
 
 A [Herdr](https://herdr.dev) layout: [`agent-deck`](agent-deck/RECIPE.md).
 
-It shows every agent and terminal on every machine. Space rows list their chats, shells and running programs. Agents are cards, and hover cards work on the narrow rail. An Overview board (`⌘⇧O`) has one lane per agent state and one lane per machine for terminals, with each terminal's command and last output lines.
+It shows every agent and terminal on every machine. Space rows list their chats, shells and running programs. Agents are cards, and hover cards work on the narrow rail. An Overview board (`⌘⇧O`) has one lane per agent state and one lane per machine for terminals, with each terminal's command and last output lines; its `Usage` button shows each machine's CPU, memory and disk use.
 
 ![Overview: agents](agent-deck/preview.png)
 
@@ -20,7 +20,9 @@ Ask an agent in Herdr to add `github.com/zztalker/herdr-agent-deck/tree/main/age
 
 **Waiting:** agents at rest whose background shells still run (Claude Code's `run_in_background`) show as Waiting, in the Overview's Working lane. That needs the Claude Code hook from [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) and an hc with `hc report` ([herdrdev/herdr-core#81](https://github.com/herdrdev/herdr-core/pull/81)); its `agents-waiting` mod isn't needed with this layout.
 
-What it runs: `hc machine ls` and `hc read` (read-only). It also runs `git` in each space's folder, on its machine (inherited from Herdr's Spaces). No network, no writes.
+What it runs: `hc machine ls` and `hc read` (read-only). When you press `Usage`, `hc exec` runs a short read-only `sh` script on each machine (`/proc`, `top`/`vm_stat`, `df`). It also runs `git` in each space's folder, on its machine (inherited from Herdr's Spaces). No network, no writes.
+
+Changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License
 

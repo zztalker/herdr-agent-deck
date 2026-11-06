@@ -43,7 +43,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
 **Main area:** the shipped tab bar (42px), panes, a `files`/`changes` panel (368px) and the `workspace-status` bar (28px). These are unchanged from Herdr's main layout.
 
 **Overview:** a dialog at 85% × 85% of the window.
-- **Title row** (44px): `Overview`, the tab switch `Agents N | Terminals N`, the machine count, a filter box (up to 360px, `search` icon, `accent` border while it has text), status pills (Agents tab only) and a close button.
+- **Title row** (44px): `Overview`, the tab switch `Agents N | Terminals N`, the machine count, a filter box (up to 360px, `search` icon, `accent` border while it has text), status pills (Agents tab only), a bordered `Usage` button (Terminals tab only; `Usage…` while measuring) and a close button.
 - **Machine strip:** one chip per machine with a connection dot, `N agents · N terms`; the tooltip shows the state, `hc` version and hidden terminals.
 - **Agents tab:** four lanes, left to right:
   - **Working** (`working` color), **Needs you** (`blocked`), **Done** (`done`) and **Idle** (`idle`), each with a 2px colored underline and a count;
@@ -51,7 +51,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
   - inside a lane, agents are grouped by machine (small header, count);
   - cards are at least 240px and wrap several to a line;
   - an empty lane shrinks to 150px and says `None`.
-- **Terminals tab:** one lane per machine. The header shows the count, `N running` and `N hidden`, and on a connected machine a `+` at the right (tooltip `New space on <machine>`); the underline is `ansi2` when connected. Cards are at least 260px. Each card shows:
+- **Terminals tab:** one lane per machine. The header shows the count, `N running` and `N hidden`, and on a connected machine a `+` at the right (tooltip `New space on <machine>`); the underline is `ansi2` when connected. After `Usage` was pressed, a 24px row under the header reads `CPU 12% · MEM 47% · Disk 81%` (labels `dim`, values semibold: `foreground`, `working` from 75%, `blocked` from 90%, `–` for one it could not measure); `Measuring…` while it runs, or `Usage: <reason>` (tooltip: the full reason) for a machine that is not connected or did not answer. Cards are at least 260px. Each card shows:
   - the program icon;
   - the command as typed (`make test`), `zsh` for an idle shell, or the chat name for an agent;
   - a state word: `running` (accent), `idle`, or the agent's status;
@@ -76,6 +76,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
   - a terminal card in a pane runs `pane.focus`;
   - a hidden terminal (in no space) runs `terminal.peek`;
   - a Terminals lane's `+` runs `space.new {machine}` (empty for this computer): a new space with a shell in that machine's home. Then the Overview closes.
+  - `Usage` measures this computer and every connected machine in parallel; each lane fills in as its answer comes. Pressing it again while a machine is still measuring skips that machine.
 
 **Filter:** typing goes to the filter box as the Overview opens. Every word must appear on a card (any case), or the card is hidden:
 - an agent: chat name, program, state word, space, tab, machine (`local` for this computer);
@@ -86,6 +87,7 @@ While it has text, the tabs read `Agents 3/9`, the pills count only what matches
 **Keys and commands:**
 - `⌘⇧O` (`mod.open:agent-deck-overview`) toggles the Overview; `Esc` closes it.
 - `agent-deck-overview.agents` and `agent-deck-overview.terminals` switch its tab while it's open.
+- `agent-deck-overview.usage` switches to Terminals and measures, like the button.
 - The tab you used last is remembered.
 
 **Tab names:** a tab holding exactly one agent with a real chat name takes that name, cut to 48 characters. It's checked every 3 seconds and follows the chat if it's renamed. Herdr's own alerts then read `Claude Code needs you`, then `space / <chat name>` instead of `space / 1`. Tabs someone named stay as they are. Clearing a tab's name (an empty `tab.rename`) hands it back. `NAME_TABS = false` at the top of `agent-deck-agents` turns this off.
@@ -93,6 +95,7 @@ While it has text, the tabs read `Agents 3/9`, the pills count only what matches
 **Refresh:**
 - Machines: every 15s (Spaces) and 30s (Overview).
 - Terminal output lines: every 8s, one `hc read` at a time, only while the Terminals tab shows.
+- Usage: never on its own; only when `Usage` is pressed. The numbers stay until the next press or until the Overview reloads.
 
 ## Built from
 
@@ -114,11 +117,17 @@ While it has text, the tabs read `Agents 3/9`, the pills count only what matches
   - It runs `hc machine ls --json` and `hc read <address>`.
   - It uses `nextCommand()` for the tab commands, and `InputState` / `Input` (from `gpui-base`) for the filter.
   - It applies the same `waits` rule to `agents()` and puts waiting agents in the Working lane.
+  - `usage.js` (no imports, so node can test it): `USAGE_SCRIPT`, one POSIX `sh` script that prints `cpu=N mem=N disk=N`; `usageArgs(machine)`, the `hc` arguments (`exec [--on m] --timeout 20 -- sh -c <script>`); `parseUsage(stdout)`, the last such line as `{cpu, mem, disk}` (0..100, `null` for an empty field), or `null`. Tests: `usage.test.mjs`, run with `node --test usage.test.mjs` in the mod folder.
+    - Linux: CPU busy share over 1 s from two `/proc/stat` reads; memory `(MemTotal − MemAvailable) / MemTotal`.
+    - macOS: CPU `100 − idle` from the second sample of `top -l 2 -n 0 -s 1`; memory (active + wired + compressor pages) × page size / `hw.memsize`.
+    - Disk: `df -P "$HOME"`'s capacity: the Data volume on macOS, `/` on a typical VM.
+  - `machineNames()`: this computer, then every machine with a space or in `hc machine ls`, sorted; used by `render` and by `measure`.
 - **`keys.json`:** `global` → `cmd-shift-o`.
 - **Shipped mods used as-is:** `workspace-chrome` (also its SVG icons: server, monitor, layers, x, plus, chevron-down/right, pin, pin-off, branch, spinner, clock, check), `tabs`, `pane`, `files`, `changes`, `workspace-status`.
 
 Runs programs and reads files:
 - `hc` (read-only: `machine ls`, `read`).
+- `hc exec` with the Usage script, only when `Usage` is pressed: it reads `/proc/stat`, `/proc/meminfo` and `df` on Linux, `top`, `vm_stat`, `sysctl` and `df` on macOS, and changes nothing.
 - `agent-deck-spaces` keeps Herdr's own git tail from the shipped `spaces` mod. It runs `git` (`rev-parse`, `status`) in each space's folder, on that space's machine for remote spaces, and `watchFolder`s local repos' git folders to refresh on commits.
 - No network, no writes.
 
@@ -137,6 +146,10 @@ Runs programs and reads files:
 - **Divider:** Herdr drags anywhere in a row/column's `gap`, but its resize cursor shows only part of the time there (Herdr 0.1.11, macOS). A divider as wide as the gap looks heavy, so this layout keeps a thin line. Mods can't draw in the gap, so the line is the only grab cue. Drop the Agents mod's own top border, or it doubles the line.
 - **Base:** `agent-deck-spaces` is based on the shipped `spaces` of Herdr 0.1.11 (drag-reorder with a drop line and a same-machine guard). When a later Herdr changes that mod, re-apply the `agent-deck:` changes to the new one.
 - **Wrapped cards:** `flex_1().min_w(N)` in a `flex_wrap()` row gives full-width cards that pair up once the lane is wide enough.
+- **Usage script:** pass it as argv (`hc exec … -- sh -c <script>`). `hc exec` runs argv with no shell, so the script never reaches the machine's login shell (fish would not parse it).
+- **No detaching under `hc exec`:** everything it started ends with it, `setsid nohup … &` included. Run what must outlive the call in an `hc` terminal instead.
+- **Conditional children:** `.child()` takes no `null`; add an optional row with `.when(cond, el => el.child(…))`.
+- **Status colors as warnings:** `done` is blue in some themes; use `working` (amber) for "getting full", `blocked` for "full".
 
 ## Done when
 
@@ -151,4 +164,6 @@ Runs programs and reads files:
 - Clicking `Agents` hides Spaces and gives Agents the height; clicking it again brings Spaces back at the size it had.
 - Typing `ai-ws done` in the Overview leaves only finished agents on ai-ws, and the tab reads `Agents 1/9`; `Esc` brings the rest back.
 - `⌘⇧O` opens the Overview and pressing it again closes it; with a remote machine added, its lane and strip chip show its `hc` version.
+- Pressing `Usage` on the Terminals tab fills a `CPU · MEM · Disk` row under every connected machine's lane within about 3 seconds, matching `free` / `df` there; a disconnected machine's row says why.
+- `node --test usage.test.mjs` passes in `mods/agent-deck-overview`.
 - `herdr-app check` passes for all three mods.
