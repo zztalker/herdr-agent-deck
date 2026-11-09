@@ -9,8 +9,12 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
-import { terminals, agents, panes, focused, hc, theme, props, closeOverlay } from "herdr";
-import { customLabels, knownValues, remember, suggest, labelArgs } from "./edit.js";
+import { terminals, agents, panes, focused, hc, theme, props, closeOverlay, shared, setShared, settings } from "herdr";
+import { customLabels, knownValues, remember, suggest, labelArgs, withTaskColor } from "./edit.js";
+import { COLOR_NAMES, PALETTES } from "./colors.js";
+
+// agent-deck: task -> color name, read by the Agents rail (agent-deck-agents/badge.js).
+const TASK_COLORS = "agent-deck.task-colors";
 
 function cached(key) {
   try { return JSON.parse(localStorage.getItem(key) ?? "[]"); } catch { return []; }
@@ -33,6 +37,9 @@ export default class Labels extends View {
     this.rows = x ? [this.row("role", this.labels.role ?? "", true), this.row("task", this.labels.task ?? "", true),
       ...customLabels(this.labels).filter(([k]) => k !== "role" && k !== "task").map(([k, v]) => this.row(k, v, false))] : [];
     this.focus = this.rows[0] ?? null;
+    // agent-deck: the color picked in the color row; undefined until one is clicked, so the row
+    // shows what the Task field's task has saved.
+    this.pick = undefined;
     this.focus?.v.focus();
   }
 
@@ -71,9 +78,24 @@ export default class Labels extends View {
     if (id) closeOverlay(id);
   }
 
+  // agent-deck: the Task field as typed now, and that task's color (null: Auto).
+  taskNow() {
+    return (this.rows.find((r) => r.fixed && r.key === "task")?.v.value() ?? "").trim();
+  }
+  colorNow() {
+    if (this.pick !== undefined) return this.pick;
+    return (shared(TASK_COLORS) ?? {})[this.taskNow()] ?? null;
+  }
+
   save(cx) {
     if (this.saving || !this.rows.length) return;
     const rows = this.rows.map((r) => [r.fixed ? r.key : r.k.value(), r.v.value()]);
+    // agent-deck: a picked color is saved for the task in the Task field, even with no label change.
+    if (this.pick !== undefined && this.taskNow()) {
+      const before = shared(TASK_COLORS) ?? {};
+      const after = withTaskColor(before, this.taskNow(), this.pick);
+      if (JSON.stringify(after) !== JSON.stringify(before)) setShared(TASK_COLORS, after);
+    }
     let args;
     try {
       args = labelArgs(this.labels, rows);
@@ -116,6 +138,29 @@ export default class Labels extends View {
       .child(Input.new(state).flex_1().h_full().text_size(12).text_color(t.foreground));
   }
 
+  // agent-deck: Auto, then the 10 task colors (colors.js); the rail shows the pick for every
+  // session of the task. Without a task there's nothing to color.
+  colorRow(t) {
+    const task = this.taskNow();
+    const now = this.colorNow();
+    const pal = settings()?.dark !== false ? PALETTES.dark : PALETTES.light;
+    const choose = (c) => (_e, cx) => { if (!task) return; this.pick = c; cx.notify(); };
+    const auto = div().id("lb-color-auto").flex_none().px(8).h(20).flex().items_center().rounded(10).border(1)
+      .border_color(now === null ? t.accent : t.border).text_size(11).text_color(now === null ? t.foreground : t.dim)
+      .when(Boolean(task), (el) => el.cursor_pointer().hover((s) => s.bg(t.hover)))
+      .tooltip("A color worked out from the task's name")
+      .on_click(choose(null)).child("Auto");
+    const dot = (c) => div().id(`lb-color-${c}`).size(20).flex_none().rounded_full().border(2)
+      .border_color(now === c ? t.accent : t.chrome).bg(task ? pal[c].bg : pal[c].bg + "66")
+      .when(Boolean(task), (el) => el.cursor_pointer())
+      .tooltip(c).on_click(choose(c));
+    return v_flex().id("lb-color").gap(4)
+      .child(h_flex().gap(8).items_center()
+        .child(div().w(64).flex_none().text_size(12).text_color(t.dim).child("Color"))
+        .child(h_flex().flex_1().min_w(0).flex_wrap().gap(6).items_center().child(auto).children(COLOR_NAMES.map(dot))))
+      .child(div().pl(72).text_size(11).text_color(t.dim).child(task ? `For every session of task ${task}` : "Set a task to give it a color"));
+  }
+
   render(_cx) {
     const t = theme();
     const rowEl = (r, i) => {
@@ -151,6 +196,7 @@ export default class Labels extends View {
         .child(div().flex_none().font_semibold().text_color(t.foreground).child("Labels"))
         .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.dim).child(this.address ? `${this.name} · ${this.address}` : "")))
       .child(v_flex().gap(8).children(this.rows.map(rowEl)))
+      .when(this.rows.length > 0, (el) => el.child(this.colorRow(t)))
       .when(this.rows.length > 0, (el) => el.child(h_flex().child(div().id("lb-add").flex_none().px(8).py(3).rounded(6).text_size(12).text_color(t.dim).cursor_pointer()
         .hover((s) => s.bg(t.hover).text_color(t.foreground))
         .tooltip("Add another label")

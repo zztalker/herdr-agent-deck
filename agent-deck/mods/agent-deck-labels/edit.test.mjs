@@ -90,3 +90,30 @@ test("labelArgs: a key starting with - is refused (hc would take `-x=1` for an o
   assert.throws(() => labelArgs({}, [["-x", "1"]]), /key/);
   assert.throws(() => labelArgs({}, [["--json", "1"]]), /key/);
 });
+
+// --- a task's color (shared "agent-deck.task-colors") ---------------------------------------
+
+import { withTaskColor } from "./edit.js";
+import { COLOR_NAMES as LABEL_COLOR_NAMES, PALETTES as LABEL_PALETTES } from "./colors.js";
+import { COLOR_NAMES as RAIL_COLOR_NAMES, PALETTES as RAIL_PALETTES } from "../agent-deck-agents/badge.js";
+
+test("withTaskColor: sets, changes and (null) removes a task's color; the map isn't changed in place", () => {
+  const map = { "cloud-scan": "teal" };
+  assert.deepEqual(withTaskColor(map, "review-release", "red"), { "cloud-scan": "teal", "review-release": "red" });
+  assert.deepEqual(withTaskColor(map, "cloud-scan", "blue"), { "cloud-scan": "blue" });
+  assert.deepEqual(withTaskColor(map, "cloud-scan", null), {});
+  assert.deepEqual(map, { "cloud-scan": "teal" });
+});
+
+test("withTaskColor: no task, an unknown color or a missing map", () => {
+  assert.deepEqual(withTaskColor({ a: "red" }, "", "blue"), { a: "red" });
+  assert.deepEqual(withTaskColor({ a: "red" }, "  ", "blue"), { a: "red" });
+  assert.deepEqual(withTaskColor({ a: "red" }, "a", "magenta"), { a: "red" });
+  assert.deepEqual(withTaskColor(undefined, "a", "red"), { a: "red" });
+  assert.deepEqual(withTaskColor({ a: "red" }, " a ", "blue"), { a: "blue" });
+});
+
+test("the color row's palettes are the rail's (agent-deck-agents/badge.js)", () => {
+  assert.deepEqual(LABEL_COLOR_NAMES, RAIL_COLOR_NAMES);
+  assert.deepEqual(LABEL_PALETTES, RAIL_PALETTES);
+});

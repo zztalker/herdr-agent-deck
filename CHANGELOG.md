@@ -5,7 +5,9 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 ## 2026-11-09
 
 ### Added
-- **Label badges on the rail:** a session with a `task` or `role` label shows their first letters (`CR` for cloud-scan / reviewer) instead of its program icon, in one of 26 colors picked by the first letter, all readable with white text. Without labels the icon stays. Tests: `agent-deck-agents/badge.test.mjs`.
+- **Label badges on the rail:** a session with a `task` or `role` label shows their first letters (`CR` for cloud-scan / reviewer) instead of its program icon. Without labels the icon stays.
+- **One color per task:** a badge's color is its task's, one of 10 that can't be confused, with a palette for the dark and the light appearance. It's worked out from the task's name, and a task whose color another task on the rail already has takes the next free one, so up to 10 tasks on screen never share. A task keeps its color while it stays on the rail. (The first version colored by the first letter, from 26 colors; too many of them looked alike at badge size.) Tests: `agent-deck-agents/badge.test.mjs`.
+- **Choose a task's color:** a Color row in the label editor (`Auto` and the 10 colors) saves a color for the task, shared by all its sessions and kept across restarts (`agent-deck.task-colors` in Herdr's shared state).
 - **The rail looks like herdr-app [PR #286](https://github.com/herdrdev/herdr-app/pull/286)** (by ali, ported into `agent-deck-spaces` and `agent-deck-agents`, which don't get Herdr's changes): spaces are centered colored avatars with a status dot when they need you, agents are their program's icon and status mark, and the `«` / `»` button is a 26px button. The hover cards stay. The PR's `workspace-chrome` part (the brand row, snapping out of in-between widths) arrives with Herdr, since agent-deck uses that mod as shipped.
 - **Copy link on Agents cards:** resting on a Claude Code card in the Agents column (or its hover card on the rail) shows the link icon, as on Overview cards.
 - **`«` / `»` in the Agents footer:** `«` narrows the sidebar to the rail, `»` brings back its width.

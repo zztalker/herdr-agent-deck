@@ -22,7 +22,7 @@ Ask an agent in Herdr to add `github.com/zztalker/herdr-agent-deck/tree/main/age
 
 **Waiting:** agents at rest whose background shells still run (Claude Code's `run_in_background`) show as Waiting, in the Overview's Working lane. That needs the Claude Code hook from [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) and an hc with `hc report` ([herdrdev/herdr-core#81](https://github.com/herdrdev/herdr-core/pull/81)); its `agents-waiting` mod isn't needed with this layout.
 
-What it runs: `hc machine ls` and `hc read` (read-only). When you press `Usage`, `hc exec` runs a short read-only `sh` script on each machine (`/proc`, `top`/`vm_stat`, `df`). While History is open, `hc exec` runs a read-only scan of `~/.claude/projects` on each machine, keeping its own cache in `~/.cache/agent-deck-history/`; Copy link reads `~/.claude/sessions/<pid>.json`. It also runs `git` in each space's folder, on its machine (inherited from Herdr's Spaces). The one write outside that cache: `hc label` when you save in the label editor. No network.
+What it runs: `hc machine ls` and `hc read` (read-only). When you press `Usage`, `hc exec` runs a short read-only `sh` script on each machine (`/proc`, `top`/`vm_stat`, `df`). While History is open, `hc exec` runs a read-only scan of `~/.claude/projects` on each machine, keeping its own cache in `~/.cache/agent-deck-history/`; Copy link reads `~/.claude/sessions/<pid>.json`. It also runs `git` in each space's folder, on its machine (inherited from Herdr's Spaces). The writes outside that cache: `hc label` when you save in the label editor, and the task colors you pick there (`agent-deck.task-colors` in Herdr's `shared.json`). No network.
 
 Changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
 

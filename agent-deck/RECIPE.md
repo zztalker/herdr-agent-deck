@@ -35,7 +35,7 @@ Herdr's main window rebuilt to show what every agent is doing on every machine. 
 - **Copy link on Agents cards:** resting on a Claude Code card (program key `claude`) shows a 12px link icon before the pin, as on Overview cards: `ansi2` for 2 s after a copy, `blocked` when there's no session to link yet. The rail's hover cards have it too.
 - **Sidebar footer** (69px): the shipped `workspace-chrome` footer.
 
-**Narrow rail** (under 160px wide, 76px on macOS), the cells as in herdr-app [PR #286](https://github.com/herdrdev/herdr-app/pull/286), centered: a space is its 22px colored avatar (a branch mark for a worktree), 34px high (30 for a worktree), with a 9px status dot on its corner when it needs you; the active one has the `selected` background, and right-click opens its menu. The `+` above them is centered. An agent is its program's 16px icon (its number when it has none) and its status mark, or, when its terminal has a `task` or `role` label, a badge instead of the icon: the first letter of `task`, then of `role` (a missing one leaves its place empty), white bold 10.5px on an 18px-high block (22px wide at least, 5px radius) in one of 26 colors picked by the first letter (`agent-deck-agents/badge.js`). The colors were chosen to be as far apart as possible in OKLab, each with white text at 4.5:1 or better, and ordered so neighbouring letters differ; 30px high, 8px radius; the focused one has the `selected` background and an `accent` border. The `«` / `»` button is 26px with a `hover` background. Resting on any row for 250ms opens its wide card to the right:
+**Narrow rail** (under 160px wide, 76px on macOS), the cells as in herdr-app [PR #286](https://github.com/herdrdev/herdr-app/pull/286), centered: a space is its 22px colored avatar (a branch mark for a worktree), 34px high (30 for a worktree), with a 9px status dot on its corner when it needs you; the active one has the `selected` background, and right-click opens its menu. The `+` above them is centered. An agent is its program's 16px icon (its number when it has none) and its status mark, or, when its terminal has a `task` or `role` label, a badge instead of the icon: the first letter of `task`, then of `role` (a missing one leaves its place empty), bold 10.5px on an 18px-high block (22px wide at least, 5px radius) in its task's color (`agent-deck-agents/badge.js`). There are 10 colors that can't be confused (red, orange, yellow, green, teal, blue, purple, pink, brown, grey), one palette per appearance (`settings().dark`), each with its letters (white or dark) at 4.5:1 or better and standing out from that sidebar. A task's color is the one chosen for it in the label editor, else its home color (FNV-1a of the task name, mod 10), else, when a task above it on the rail has that, the next free one; a task keeps its color while it stays listed, so with 10 or fewer tasks on screen no two share one. A session with only a role goes by that role; 30px high, 8px radius; the focused one has the `selected` background and an `accent` border. The `«` / `»` button is 26px with a `hover` background. Resting on any row for 250ms opens its wide card to the right:
 - an agent card is 300px wide and includes its sub-agents;
 - a space card is 320px wide.
 
@@ -104,6 +104,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
 - Label editor:
   - clicking a suggestion puts it in the field;
   - `Save` or Enter in any field runs `hc label <address> k=v… k=…` with only what changed (an emptied value or a removed row sends `k=`), remembers the role and task in the mod's localStorage, and closes; nothing changed just closes;
+  - a **Color** row under the label rows: `Auto` (a pill, `accent` border when chosen) and 10 20px color dots (`accent` ring on the chosen one), with `For every session of task <task>` below, or `Set a task to give it a color` (dots faded) while Task is empty. Save stores the pick for the task in the Task field, in shared state `agent-deck.task-colors` (`{task: color name}`; `Auto` removes the task), even when no label changed;
   - `Cancel` or `Esc` closes without writing.
 
 **Filter:** typing goes to the filter box as the Overview opens. Every word must appear on a card (any case), or the card is hidden:
@@ -156,7 +157,9 @@ The task menu filters too: a card shows only if its terminal's `task` label is t
 - **`mods/agent-deck-labels`:** new, `mod.json` overlay `{ kind: "dialog", width: 560 }`.
   - It edits `props().terminal`, else `focused().terminal`; the name comes from `agents()` / `panes()` titles, else the program.
   - `edit.js` (no imports, so node can test it): `customLabels` (the starting rows), `knownValues(terminals, key, cache)`, `remember(cache, value, max = 50)`, `suggest(values, typed, limit = 8)` and `labelArgs(before, rows)` (the `hc label` arguments; refuses keys with spaces or `=` or a leading `-`, never touches `where` / `herdr.*`). Tests: `edit.test.mjs`.
-  - It runs `hc label <address> …` on Save, nothing else.
+  - It runs `hc label <address> …` on Save, and writes shared `agent-deck.task-colors` when a color was picked.
+  - `colors.js`: a copy of `agent-deck-agents/badge.js`'s `COLOR_NAMES` and `PALETTES` for the color row; `edit.test.mjs` checks the two match. `edit.js` adds `withTaskColor(map, task, color)` (null removes).
+  - `edit.js` and `colors.js` have no Herdr imports, so node can test them.
   - `tag.svg`: Lucide's `tag` icon (ISC), also used by the Overview and the tab bar.
 - **`layouts/agent-deck-preview.png`:** the Settings picture (root `"preview"`): the Overview's Agents tab, 480×300 (1.6:1, the shape Settings cards show).
 - **`mods/agent-deck-agents`:** modified from the shipped `agents` mod. It adds:
@@ -188,7 +191,7 @@ Runs programs and reads files:
 - `hc` (read-only: `machine ls`, `read`).
 - `hc exec` with the Usage script, only when `Usage` is pressed: it reads `/proc/stat`, `/proc/meminfo` and `df` on Linux, `top`, `vm_stat`, `sysctl` and `df` on macOS, and changes nothing.
 - `agent-deck-spaces` keeps Herdr's own git tail from the shipped `spaces` mod. It runs `git` (`rev-parse`, `status`) in each space's folder, on that space's machine for remote spaces, and `watchFolder`s local repos' git folders to refresh on commits.
-- `hc label <address> …` when Save is pressed in the label editor: the only write.
+- `hc label <address> …` when Save is pressed in the label editor, and shared `agent-deck.task-colors` (in `~/.config/herdr-app/shared.json`) when a color was picked: the only writes.
 - History: `hc exec` with `SCAN` on each reachable machine while the dialog is open (reads transcripts, writes only `~/.cache/agent-deck-history/index.tsv`); `SESSIONS` and `NEAREST` when a row is opened.
 - Copy link: `hc get` (when `terminals()` lacks the pid) and `hc exec` with `SESSION_OF` on the card's machine.
 - No network.
@@ -245,7 +248,8 @@ Runs programs and reads files:
 - With two agents on `task=PROJ-1` and one on `PROJ-2`, the task menu lists `PROJ-1 2`, `PROJ-2 1`; picking `PROJ-1` leaves those two on both tabs and the tab reads `Agents 2/N`.
 - Clicking an agent card's tag icon opens the editor and does not go to the agent.
 - `node --test edit.test.mjs` passes in `mods/agent-deck-labels`, `node --test labels.test.mjs usage.test.mjs` in `mods/agent-deck-overview`, `node --test labels.test.mjs` in `mods/agent-deck-pane`, `node --test name.test.mjs` in `mods/agent-deck-tabs`, and `node --test badge.test.mjs title.test.mjs resume.test.mjs` in `mods/agent-deck-agents`.
-- A session labelled `task=cloud-scan role=reviewer` reads `CR` on the rail in magenta; one with only `task=review` reads `R`; one without labels shows its program icon.
+- A session labelled `task=cloud-scan role=reviewer` reads `CR` on the rail; every `cloud-scan` session has the same color, and up to 10 different tasks on the rail all have different ones; one with only `task=review` reads `R`; one without labels shows its program icon.
+- Picking red in the label editor's Color row for `review-release` and saving turns its badges red; a task whose home color was red moves to another one; `Auto` brings back the worked-out color.
 - After `hc label <t> role=lead task=PROJ-1`, that terminal's pane header shows `role lead` and `task PROJ-1` chips at its right end; `hc label <t> role= task=` removes them.
 - The search icon in the Agents footer opens History; with an empty box it lists recent past sessions from every connected machine, none of them running now.
 - Typing a word from an old session's title on devbox lists it with `devbox · ~/…`; Enter opens a new tab on devbox running `claude --resume <id>` in that folder.

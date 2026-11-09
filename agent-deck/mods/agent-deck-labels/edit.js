@@ -1,6 +1,8 @@
 // agent-deck: editing a terminal's labels (`hc label t7 role=reviewer`): the starting rows,
 // what to suggest while typing, and what to send to `hc label`.
-// No imports, so node can test it (edit.test.mjs).
+// Only its own folder's colors.js, so node can test it (edit.test.mjs).
+
+import { COLOR_NAMES } from "./colors.js";
 
 // Herdr's own labels: never edited here. Same rule as agent-deck-overview/labels.js
 // (a mod can't import another mod's files).
@@ -59,4 +61,15 @@ export function labelArgs(before, rows) {
   }
   for (const k of had.keys()) if (!want.has(k)) out.set(k, "");
   return [...out.keys()].sort().map((k) => `${k}=${out.get(k)}`);
+}
+
+// The shared "agent-deck.task-colors" map (task -> color name) with `task`'s color set, or
+// removed for null (Auto). A blank task or an unknown color leaves it as it was. A new object.
+export function withTaskColor(map, task, color) {
+  const t = (task ?? "").trim();
+  const out = { ...(map ?? {}) };
+  if (!t) return out;
+  if (color === null) delete out[t];
+  else if (COLOR_NAMES.includes(color)) out[t] = color;
+  return out;
 }
