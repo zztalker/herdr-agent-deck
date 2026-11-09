@@ -5,6 +5,7 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 ## 2026-11-09
 
 ### Added
+- **Label badges on the rail:** a session with a `task` or `role` label shows their first letters (`CR` for cloud-scan / reviewer) instead of its program icon, in one of 26 colors picked by the first letter, all readable with white text. Without labels the icon stays. Tests: `agent-deck-agents/badge.test.mjs`.
 - **The rail looks like herdr-app [PR #286](https://github.com/herdrdev/herdr-app/pull/286)** (by ali, ported into `agent-deck-spaces` and `agent-deck-agents`, which don't get Herdr's changes): spaces are centered colored avatars with a status dot when they need you, agents are their program's icon and status mark, and the `«` / `»` button is a 26px button. The hover cards stay. The PR's `workspace-chrome` part (the brand row, snapping out of in-between widths) arrives with Herdr, since agent-deck uses that mod as shipped.
 - **Copy link on Agents cards:** resting on a Claude Code card in the Agents column (or its hover card on the rail) shows the link icon, as on Overview cards.
 - **`«` / `»` in the Agents footer:** `«` narrows the sidebar to the rail, `»` brings back its width.

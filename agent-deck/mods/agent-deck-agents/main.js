@@ -8,6 +8,7 @@ import { v_flex, h_flex, HoverCard } from "gpui-base";
 import { agents, hc, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout } from "herdr";
 import { SESSION_OF, sessionFrom, resumeLink, machineOf } from "./resume.js";
 import { liveTitle } from "./title.js";
+import { labelBadge } from "./badge.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -371,6 +372,7 @@ export default class Agents extends View {
       const machine = a.address.includes("/") ? a.address.split("/")[0] : null;
       // agent-deck: on the rail, resting on a row shows its wide card beside it.
       if (collapsed && !wide) {
+        const badge = labelBadge(byAddress.get(a.address)?.labels);
         return HoverCard.new(`ag-hover-${a.address}`).anchor("left_center").open_delay(250)
           .content(v_flex().w(300).p(6).rounded(10).bg(t.popover).border(1).border_color(t.border).shadow_lg()
             .child(row(a, i, this.tree(all, a.address), true))
@@ -389,7 +391,10 @@ export default class Agents extends View {
           .when(!a.focused, (el) => el.hover((s) => s.bg(t.hover)))
           .cursor_pointer()
           .on_click(() => run("pane.focus", { pane: a.pane }))
-          .child(pic ?? div().w(16).flex_none().text_center().text_size(11).text_color(a.focused ? t.foreground : t.muted).child(String(i + 1)))
+          // agent-deck: a session with a task or role label shows their letters (badge.js) instead.
+          .child(badge
+            ? h_flex().h(18).min_w(22).px(3).flex_none().rounded(5).bg(badge.color).items_center().justify_center().text_size(10.5).font_bold().text_color("#ffffff").child(badge.text)
+            : pic ?? div().w(16).flex_none().text_center().text_size(11).text_color(a.focused ? t.foreground : t.muted).child(String(i + 1)))
           .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true))));
       }
       const when = this.since(a);
