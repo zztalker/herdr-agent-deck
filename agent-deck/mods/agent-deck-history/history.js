@@ -113,7 +113,15 @@ export const resumeLink = (r) => `herdr-resume://${r.machine ?? "local"}/${r.id}
 // Shell snippets run on the session's machine. Claude Code keeps ~/.claude/sessions/<pid>.json
 // ({pid, sessionId, …}) while a session runs; a crash can leave one behind, so a pid only
 // counts when a terminal runs it now.
-export const SESSIONS = String.raw`for f in "$HOME"/.claude/sessions/*.json; do [ -f "$f" ] && { cat "$f"; echo; }; done`;
+// Each session file, then for a running one the same session under its parent's pid: a local
+// terminal's program is Herdr's shell wrapper (`fish -lic 'command claude; exec fish'`), claude
+// its child. A copy lives in resume-link/agent_deck_resume.py: change both.
+export const SESSIONS = String.raw`for f in "$HOME"/.claude/sessions/*.json; do [ -f "$f" ] || continue
+cat "$f"; echo
+p=$(basename "$f" .json); id=$(grep -oE '"sessionId" *: *"[0-9a-f-]{36}"' "$f" | head -1 | cut -d'"' -f4)
+pp=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+[ -n "$id" ] && [ -n "$pp" ] && echo "{\"pid\":$pp,\"sessionId\":\"$id\"}"
+done; exit 0`;
 // The folder if it still exists, else its nearest existing parent (a deleted worktree, say):
 // `claude --resume <id>` finds the session from any folder. The folder comes in as $1.
 export const NEAREST = String.raw`d="$1"; while [ ! -d "$d" ]; do d=$(dirname "$d"); done; printf %s "$d"`;
@@ -129,12 +137,13 @@ export function sessionPids(out, id) {
 }
 
 // The Herdr command that reopens the row in `folder`: a new tab in a space on its machine
-// (the one in that folder first), else a new space there.
+// (the one in that folder first), else a new space there. The tab is left unnamed, so it shows
+// the session's live title and follows a later /rename.
 export function openPlan(spaces, row, folder) {
   const argv = ["claude", "--resume", row.id];
   const here = spaces.filter((s) => (s.machine ?? null) === (row.machine ?? null));
   const space = here.find((s) => s.folder === folder) ?? here[0];
-  if (space) return { command: "tab.new", args: { space: space.id, folder, argv, name: row.title } };
+  if (space) return { command: "tab.new", args: { space: space.id, folder, argv } };
   return { command: "space.new", args: { ...(row.machine ? { machine: row.machine } : {}), folder, argv } };
 }
 

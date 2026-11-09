@@ -30,7 +30,15 @@ MACHINE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 # Shell snippets for the session's machine; values come in as $1, never pasted in.
 FIND = r"""for f in "$HOME"/.claude/projects/*/"$1".jsonl; do [ -f "$f" ] && grep -m1 -oE '"cwd":"([^"\\]|\\.)*"' "$f" && break; done; exit 0"""
-SESSIONS = r"""for f in "$HOME"/.claude/sessions/*.json; do [ -f "$f" ] && { cat "$f"; echo; }; done; exit 0"""
+# Each session file, then for a running one the same session under its parent's pid: a local
+# terminal's program is Herdr's shell wrapper (fish -lic 'command claude; exec fish'), claude its
+# child. A copy of SESSIONS in agent-deck-history/history.js: change both.
+SESSIONS = r"""for f in "$HOME"/.claude/sessions/*.json; do [ -f "$f" ] || continue
+cat "$f"; echo
+p=$(basename "$f" .json); id=$(grep -oE '"sessionId" *: *"[0-9a-f-]{36}"' "$f" | head -1 | cut -d'"' -f4)
+pp=$(ps -o ppid= -p "$p" 2>/dev/null | tr -d ' ')
+[ -n "$id" ] && [ -n "$pp" ] && echo "{\"pid\":$pp,\"sessionId\":\"$id\"}"
+done; exit 0"""
 NEAREST = r"""d="$1"; while [ ! -d "$d" ]; do d=$(dirname "$d"); done; printf %s "$d" """
 
 

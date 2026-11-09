@@ -5,7 +5,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { SCAN, FULLTEXT, parseScan, parseHits, snippet, parseLink, search, recent, shortPath, sessionPids, openPlan, resumeLink } from "./history.js";
+import { SCAN, SESSIONS, FULLTEXT, parseScan, parseHits, snippet, parseLink, search, recent, shortPath, sessionPids, openPlan, resumeLink } from "./history.js";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -104,6 +104,8 @@ test("sessionPids: pids of the session's ~/.claude/sessions files (one JSON per 
   assert.equal(sessionPids("", A).size, 0);
 });
 
+// The tab gets no name: it then shows the session's live title (agent-deck-tabs/name.js), so a
+// later /rename shows there too. A name given here would freeze the title it had when reopened.
 test("openPlan: a new tab in a space on that machine, the one in the same folder first", () => {
   const spaces = [
     { id: "s1", machine: "devbox", folder: "/root" },
@@ -112,7 +114,7 @@ test("openPlan: a new tab in a space on that machine, the one in the same folder
   ];
   const row = { id: A, machine: "devbox", title: "Fix login", cwd: "/root/x" };
   assert.deepEqual(openPlan(spaces, row, "/root/x"),
-    { command: "tab.new", args: { space: "s2", folder: "/root/x", argv: ["claude", "--resume", A], name: "Fix login" } });
+    { command: "tab.new", args: { space: "s2", folder: "/root/x", argv: ["claude", "--resume", A] } });
   assert.deepEqual(openPlan(spaces, row, "/root/y").args.space, "s1");
 });
 
@@ -308,4 +310,29 @@ test("scan: no transcripts at all is no rows, not an error", () => {
   try {
     assert.deepEqual(scan(home).rows, []);
   } finally { rmSync(home, { recursive: true, force: true }); }
+});
+
+// A local terminal's program is Herdr's shell wrapper (`fish -lic 'command claude; exec fish'`):
+// its pid is claude's parent's, so SESSIONS lists a running session under its parent pid too.
+test("SESSIONS: a running session counts under its parent's pid too; a leftover file only as itself", async () => {
+  const home = mkdtempSync(join(tmpdir(), "adh-"));
+  const parent = spawn("sh", ["-c", "sleep 30; true"], { stdio: "ignore" });
+  try {
+    let kid = "";
+    for (let i = 0; i < 50 && !kid; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      kid = execFileSync("sh", ["-c", `ps -A -o pid= -o ppid= | awk -v p=${parent.pid} '$2==p{print $1}'`], { encoding: "utf8" }).trim();
+    }
+    const child = Number(kid);
+    assert.ok(Number.isInteger(child) && child > 0, "the parent has a child");
+    mkdirSync(join(home, ".claude", "sessions"), { recursive: true });
+    writeFileSync(join(home, ".claude", "sessions", `${child}.json`), JSON.stringify({ pid: child, sessionId: A }));
+    writeFileSync(join(home, ".claude", "sessions", "999999.json"), JSON.stringify({ pid: 999999, sessionId: B }));
+    const out = execFileSync("sh", ["-c", SESSIONS], { env: { HOME: home, PATH: process.env.PATH }, encoding: "utf8" });
+    assert.deepEqual([...sessionPids(out, A)].sort((x, y) => x - y), [parent.pid, child].sort((x, y) => x - y));
+    assert.deepEqual([...sessionPids(out, B)], [999999]);
+  } finally {
+    parent.kill();
+    rmSync(home, { recursive: true, force: true });
+  }
 });

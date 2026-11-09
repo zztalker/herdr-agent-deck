@@ -31,10 +31,11 @@ Herdr's main window rebuilt to show what every agent is doing on every machine. 
 - **Agents** (the other half, min 90px). Its header `Agents ⌄` rolls Spaces up (`layout.toggle {id: "spaces"}`); `Agents ›` shows it again. On the rail the same chevron sits above the list. Grouped by space, or by priority (Needs you / Done / Working / Waiting / Idle) with the sort menu. Each agent is a card (8px radius, `surface` background, `border`; focused: `selected` background and `accent` border):
   - **Line 1:** program icon, chat name (semibold), the fold chevron with sub-agent count, time in state (a pin on hover), status mark.
   - **Line 2:** chips `@machine` (`@local` here) and the space name.
-- **Agents footer** (28px): on the left a layers icon (Overview) and, 12px after it, a search icon (History). On the rail it is 76px and stacks the two icons over Herdr's `»` (widen the sidebar).
+- **Agents footer** (28px): on the left a layers icon (Overview) and, 12px after it, a search icon (History); at the right `«` (tooltip `Narrow the Agents column`) narrows the sidebar to the rail. On the rail it is 76px and stacks the two icons over `»` (`Widen the Agents column`), which brings back the width it had (268px by default).
+- **Copy link on Agents cards:** resting on a Claude Code card (program key `claude`) shows a 12px link icon before the pin, as on Overview cards: `ansi2` for 2 s after a copy, `blocked` when there's no session to link yet. The rail's hover cards have it too.
 - **Sidebar footer** (69px): the shipped `workspace-chrome` footer.
 
-**Narrow rail** (under 160px wide, 76px on macOS): spaces show their number and a status glyph; agents show a number and a status mark. Resting on any row for 250ms opens its wide card to the right:
+**Narrow rail** (under 160px wide, 76px on macOS): spaces show their number and a status glyph; agents show a number and a status mark; the focused agent's row has the `selected` background, an `accent` border (6px radius) and its number semibold in `foreground`. Resting on any row for 250ms opens its wide card to the right:
 - an agent card is 300px wide and includes its sub-agents;
 - a space card is 320px wide.
 
@@ -132,7 +133,7 @@ The task menu filters too: a card shows only if its terminal's `task` label is t
 - `mod.open:agent-deck-labels` opens the label editor for the focused terminal (the tab bar button does the same).
 - The tab you used last is remembered.
 
-**Tab names:** a tab holding exactly one agent with a real chat name takes that name, cut to 48 characters. It's checked every 3 seconds and follows the chat if it's renamed. Herdr's own alerts then read `Claude Code needs you`, then `space / <chat name>` instead of `space / 1`. Tabs someone named stay as they are. Clearing a tab's name (an empty `tab.rename`) hands it back. `NAME_TABS = false` at the top of `agent-deck-agents` turns this off.
+**Tab names:** a tab holding exactly one agent with a real chat name takes that name, cut to 48 characters. It's checked every 3 seconds and follows the chat if it's renamed. Herdr's own alerts then read `Claude Code needs you`, then `space / <chat name>` instead of `space / 1`. Tabs someone named stay as they are, so History opens its tabs unnamed (`openPlan`). The tab bar shows the same title for a tab that is unnamed or named only after its program (`Claude Code`) (`agent-deck-tabs/name.js`). A title counts when it isn't the program's name, a path (`~/…`, `/…`, `C:\…`) or `user@host`, after Claude's status glyph (`✳ `) is dropped (`agent-deck-agents/title.js`; `name.js` has a copy). Clearing a tab's name (an empty `tab.rename`) hands it back. `NAME_TABS = false` at the top of `agent-deck-agents` turns this off.
 
 **Refresh:**
 - Machines: every 15s (Spaces) and 30s (Overview).
@@ -142,14 +143,14 @@ The task menu filters too: a card shows only if its terminal's `task` label is t
 ## Built from
 
 - **`layouts/agent-deck.json`:** a clone of Herdr's `main` layout with `spaces` → `agent-deck-spaces`, `agents` → `agent-deck-agents`, `tabs` → `agent-deck-tabs` and the pane header `pane` → `agent-deck-pane`.
-- **`mods/agent-deck-tabs`:** `mod.clone` of the shipped `tabs` (Herdr 0.1.13, `cloned_from` in `mod.json`). It adds `labelButton(t, button)`: the tag button before `+`, from `focused().terminal` and that terminal's `labels` in `terminals()`, opening `openOverlay({ mod: "agent-deck-labels", kind: "dialog", width: 560, props: { terminal } })`.
+- **`mods/agent-deck-tabs`:** `mod.clone` of the shipped `tabs` (Herdr 0.1.13, `cloned_from` in `mod.json`). A tab's label comes from `tabName(tab, lead)` in `name.js` (node-tested in `name.test.mjs`). It adds `labelButton(t, button)`: the tag button before `+`, from `focused().terminal` and that terminal's `labels` in `terminals()`, opening `openOverlay({ mod: "agent-deck-labels", kind: "dialog", width: 560, props: { terminal } })`.
 - **`mods/agent-deck-pane`:** `mod.clone` of the shipped `pane` (Herdr 0.1.14, `cloned_from` in `mod.json`). It reads the pane's terminal's `labels` from `terminals()` and adds the chips after the folder. `labels.js` (no imports): `headerLabels(labels)`, the `[key, value]` pairs to show. Tests: `labels.test.mjs`.
 - **`mods/agent-deck-history`:** new, `mod.json` overlay `{ kind: "dialog", width: 720, height: 0.7 }`.
-  - `history.js` (no imports, node-tested in `history.test.mjs`): `SCAN` (the per-machine scan), `parseScan`, `parseLink`, `search(rows, query, limit = 50)`, `recent(rows, n)`, `shortPath`, `resumeLink`, `SESSIONS` / `sessionPids` (running sessions), `NEAREST` (nearest existing folder) and `openPlan(spaces, row, folder)` (the `tab.new` / `space.new` to run).
+  - `history.js` (no imports, node-tested in `history.test.mjs`): `SCAN` (the per-machine scan), `parseScan`, `parseLink`, `search(rows, query, limit = 50)`, `recent(rows, n)`, `shortPath`, `resumeLink`, `SESSIONS` / `sessionPids` (running sessions: each session file, and a running one again under its parent's pid; `resume-link/agent_deck_resume.py` has a copy), `NEAREST` (nearest existing folder) and `openPlan(spaces, row, folder)` (the `tab.new` / `space.new` to run).
   - `SCAN`: `stat` (GNU, else BSD) lists every `~/.claude/projects/*/*.jsonl` with its change time and size; ones not in `~/.cache/agent-deck-history/index.tsv` are read with `grep -oE` for `cwd` (first), `timestamp` (last), `customTitle` / `aiTitle` and `entrypoint` (`sdk-*` is left out), each row appended to the index at once; then the index is tidied to the last row of each file that still exists. Then `live<TAB>id` for each session file whose pid runs (`kill -0`).
   - `FULLTEXT` (the text as `$1`): for each transcript the index lists, `grep -v -F` drops `"type":"attachment"` and `"type":"api-request-blob"` lines, `grep -F` keeps `"type":"user"` / `"type":"assistant"` ones, then `grep -m1 -i -F --` finds the text; awk prints up to 400 characters around it. `parseHits` reads that; `snippet(raw, query, width = 60)` unescapes JSON and cuts it to whole words around the match.
   - It runs everything as `hc exec [--on m] --timeout 120 -- sh -c <script>` (argv, so a fish login shell never parses it; Herdr's `exec()` stops at 30 s).
-- **`mods/agent-deck-overview` (links):** `resume.js` (node-tested in `resume.test.mjs`): `SESSION_OF` (that pid's session file, then `found` when its transcript exists), `sessionFrom`, `resumeLink`; `link.svg` (Lucide).
+- **`mods/agent-deck-overview` (links):** `resume.js` (node-tested in `resume.test.mjs`): `SESSION_OF` (the pid whose session file it reads, that pid's or else a direct child's, the file, then `found` when its transcript exists), `sessionFrom(out)`, `resumeLink`; `link.svg` (Lucide). `agent-deck-agents` has copies of all three files for its cards' Copy link, plus `title.js` (`liveTitle(title, program)`, node-tested in `title.test.mjs`).
 - **`mods/agent-deck-agents` (footer):** the History icon runs `mod.open {name: "agent-deck-history"}`.
 - **`resume-link/`:** `agent_deck_resume.py` (Python 3, standard library; every outside call goes through one `run(argv, timeout)`, so `test_agent_deck_resume.py` drives it with a fake) and `install.sh` (`osacompile` an AppleScript `open location` handler, copy the script into `Contents/Resources`, add `CFBundleURLTypes` for `herdr-resume`, `LSUIElement`, ad-hoc `codesign`, `lsregister -f`).
 - **`mods/agent-deck-labels`:** new, `mod.json` overlay `{ kind: "dialog", width: 560 }`.
@@ -216,7 +217,7 @@ Runs programs and reads files:
 - **Filter before you match:** blob lines are huge (1,133 of them in one 987 MB transcript). `grep text | filter` reads every matching blob (21 s for that file); `grep -v blobs | grep -m1 text` takes 2 s.
 - **Mod commands carry text:** `herdr-app do "<mod>.search login"` reaches `nextCommand()` as `search login`.
 - **Most transcripts are headless:** on a box that runs automated reviews, almost all of `~/.claude/projects` is Agent SDK runs (`"entrypoint":"sdk-…"`; 1,659 of 1,684 on one VM here). Leave them out, or History is noise.
-- **A session id needs the pid:** Herdr doesn't know a terminal's Claude Code session. `~/.claude/sessions/<pid>.json` maps the running pid to it; a crash or `kill -9` can leave a file behind, so trust a pid only when a live terminal runs it.
+- **A session id needs the pid:** Herdr doesn't know a terminal's Claude Code session. `~/.claude/sessions/<pid>.json` maps the running pid to it; a crash or `kill -9` can leave a file behind, so trust a pid only when a live terminal runs it. A local terminal's program is Herdr's shell wrapper (`fish -lic 'command claude; exec fish'`), so its pid is claude's parent's: look one level down (`SESSION_OF`) or up (`SESSIONS`).
 - **AppleScript:** `handler` is a reserved word (`osacompile` fails with "Access not allowed"); name the variable otherwise. Apps macOS starts get a minimal `PATH`: add `~/.local/bin` and Homebrew in the shell line.
 - **Mouse handlers:** `on_mouse_down` / `on_mouse_up` take the button first (`"left"`); without it the mod fails when that element first renders.
 - **`herdr-app check` renders the first frame only:** a dialog or a branch that shows only after a click is not checked. Open it in the window (a command helps) and look at `herdr-app status` and a `shot`.
@@ -243,7 +244,7 @@ Runs programs and reads files:
 - Emptying Task and saving removes `task` from `hc get <t>`; Cancel writes nothing.
 - With two agents on `task=PROJ-1` and one on `PROJ-2`, the task menu lists `PROJ-1 2`, `PROJ-2 1`; picking `PROJ-1` leaves those two on both tabs and the tab reads `Agents 2/N`.
 - Clicking an agent card's tag icon opens the editor and does not go to the agent.
-- `node --test edit.test.mjs` passes in `mods/agent-deck-labels`, `node --test labels.test.mjs usage.test.mjs` in `mods/agent-deck-overview`, and `node --test labels.test.mjs` in `mods/agent-deck-pane`.
+- `node --test edit.test.mjs` passes in `mods/agent-deck-labels`, `node --test labels.test.mjs usage.test.mjs` in `mods/agent-deck-overview`, `node --test labels.test.mjs` in `mods/agent-deck-pane`, `node --test name.test.mjs` in `mods/agent-deck-tabs`, and `node --test title.test.mjs resume.test.mjs` in `mods/agent-deck-agents`.
 - After `hc label <t> role=lead task=PROJ-1`, that terminal's pane header shows `role lead` and `task PROJ-1` chips at its right end; `hc label <t> role= task=` removes them.
 - The search icon in the Agents footer opens History; with an empty box it lists recent past sessions from every connected machine, none of them running now.
 - Typing a word from an old session's title on devbox lists it with `devbox · ~/…`; Enter opens a new tab on devbox running `claude --resume <id>` in that folder.
@@ -251,6 +252,8 @@ Runs programs and reads files:
 - Pasting `herdr-resume://devbox/<id>` lists only that session.
 - With `Full text` on, typing `login` lists the sessions whose conversation mentions it, each with a line like `…fix the Login bug in auth.py…`; a word that's only in your CLAUDE.md finds nothing.
 - Picking a task in the Overview, closing it and opening it again keeps that task; the tab reads `Agents N/M`.
-- `Copy link` on a Claude Code card puts `herdr-resume://<machine|local>/<id>` on the clipboard; with the handler installed, `open '<that link>'` in a shell brings that session to the front.
+- A local Claude Code session renamed with `/rename Fix login` is called `Fix login` in the tab bar and on its Agents card; reopening it from History while it runs brings it to the front.
+- `«` in the Agents footer narrows the sidebar to the rail, with the focused agent's row highlighted; `»` brings it back.
+- `Copy link` on a Claude Code card (Overview, or resting on an Agents card) puts `herdr-resume://<machine|local>/<id>` on the clipboard; with the handler installed, `open '<that link>'` in a shell brings that session to the front.
 - `node --test history.test.mjs` passes in `mods/agent-deck-history`, `node --test resume.test.mjs` in `mods/agent-deck-overview`, and `python3 -m unittest test_agent_deck_resume` in `resume-link/`.
 - `herdr-app check` passes for all six mods.

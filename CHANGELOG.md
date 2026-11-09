@@ -5,7 +5,15 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 ## 2026-11-09
 
 ### Added
+- **Copy link on Agents cards:** resting on a Claude Code card in the Agents column (or its hover card on the rail) shows the link icon, as on Overview cards.
+- **`«` / `»` in the Agents footer:** `«` narrows the sidebar to the rail, `»` brings back its width.
+- **The focused agent stands out on the rail:** `selected` background and an `accent` border, as its wide card has.
 - **Labels in pane headers** (new `agent-deck-pane` mod, a clone of the shipped `pane`): a terminal's own labels show at the right end of its pane's top line, styled like the Overview's chips (name dimmed, value bright, tooltip `key=value`). Tests: `agent-deck-pane/labels.test.mjs`.
+
+### Fixed
+- **Tab names follow the session:** a tab named only after its program (`Claude Code`) shows the agent's chat title. Tabs History reopens are no longer named after the title they had then, so a later `/rename` shows there too. Clearing a stale name (an empty `tab.rename`) hands it back.
+- **Copy link and "bring to front" for sessions on this computer:** Herdr reports the shell wrapper's pid (`fish -lic 'command claude; exec fish'`), not claude's, so Copy link found no session and History or a `herdr-resume://` link opened a second copy of a running one. `SESSION_OF` now looks at the wrapper's child, `SESSIONS` lists a running session under its parent's pid too. Run `resume-link/install.sh` again to update the link handler.
+- **Path titles:** an agent whose title is a path (`~/src`) no longer shows as `src` in the Agents list (`agent-deck-agents/title.js`).
 
 ## 2026-11-06
 

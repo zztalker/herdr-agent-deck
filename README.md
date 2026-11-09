@@ -18,7 +18,7 @@ Ask an agent in Herdr to add `github.com/zztalker/herdr-agent-deck/tree/main/age
 2. Merge `agent-deck/keys.json` into `~/.config/herdr-app/keys.json` (it adds `cmd-shift-o`).
 3. Run `herdr-app do layout.switch --name agent-deck`. `ctrl-shift-l` switches back.
 
-**Resume links (macOS, optional):** run `resume-link/install.sh` so a click on a `herdr-resume://` link (Copy link in History or on a Claude Code card) opens that session in Herdr.
+**Resume links (macOS, optional):** run `resume-link/install.sh` so a click on a `herdr-resume://` link (Copy link in History, or on a Claude Code card in the Agents column or the Overview) opens that session in Herdr.
 
 **Waiting:** agents at rest whose background shells still run (Claude Code's `run_in_background`) show as Waiting, in the Overview's Working lane. That needs the Claude Code hook from [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) and an hc with `hc report` ([herdrdev/herdr-core#81](https://github.com/herdrdev/herdr-core/pull/81)); its `agents-waiting` mod isn't needed with this layout.
 

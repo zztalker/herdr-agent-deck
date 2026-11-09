@@ -209,7 +209,7 @@ export default class Overview extends View {
         const m = machineOfAddress(address);
         if (Number.isInteger(pid)) {
           const r = await hc(["exec", ...(m ? ["--on", m] : []), "--timeout", "20", "--", "sh", "-c", SESSION_OF, "sh", String(pid)]);
-          id = sessionFrom(r.stdout, pid);
+          id = sessionFrom(r.stdout);
         }
         if (id) cx.write_to_clipboard(resumeLink(m, id));
       } catch {}

@@ -5,7 +5,9 @@
 
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, HoverCard } from "gpui-base";
-import { agents, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout } from "herdr";
+import { agents, hc, terminals, panes, focused, spaces, run, theme, shared, setShared, setAgentOrder, openOverlay, closeOverlay, props, window, layout } from "herdr";
+import { SESSION_OF, sessionFrom, resumeLink, machineOf } from "./resume.js";
+import { liveTitle } from "./title.js";
 
 function find(node, id) {
   if (node?.id === id) return node;
@@ -32,18 +34,14 @@ function toggleSidebar() {
 const spacesHidden = () => !!find(layout(), "spaces")?.hidden;
 const toggleSpaces = () => run("layout.toggle", { id: "spaces" });
 
-const clean = (s) => (s ?? "").replace(/^[^\p{L}\p{N}]+/u, "").trim();
-
 function lead(tab, all = panes()) {
   const mine = all.filter(p => p.tab === tab.id && p.terminal);
   return mine.find(p => p.program?.agent) ?? mine.find(p => p.focused) ?? mine[0];
 }
 
 function title(tab, l) {
-  const prog = l?.program?.name;
-  const live = clean(l?.title);
-  const telling = live && live !== prog && !/^[~/]|^[A-Za-z]:\\/.test(live) && !live.includes("@") && live.toLowerCase() !== l?.program?.key;
-  return tab.name === prog && telling ? live : tab.name;
+  const live = liveTitle(l?.title, l?.program);
+  return tab.name === l?.program?.name && live ? live : tab.name;
 }
 // agent-deck: a tab with one agent takes the agent's chat name, so Herdr's
 // alerts ("Claude Code needs you · space / tab") say which chat. Only tabs
@@ -51,9 +49,8 @@ function title(tab, l) {
 const NAME_TABS = true;
 const TAB_NAME_MAX = 48;
 function chatTitle(a) {
-  const live = clean(a.title);
-  const telling = live && live !== a.program?.name && !/^[~/]|^[A-Za-z]:\\/.test(live) && !live.includes("@") && live.toLowerCase() !== a.program?.key && !/^\d+$/.test(live);
-  return telling ? (live.length > TAB_NAME_MAX ? live.slice(0, TAB_NAME_MAX - 1) + "\u2026" : live) : null;
+  const live = liveTitle(a.title, a.program);
+  return live && !/^\d+$/.test(live) ? (live.length > TAB_NAME_MAX ? live.slice(0, TAB_NAME_MAX - 1) + "\u2026" : live) : null;
 }
 
 // agent-deck: "waiting" is an idle agent whose own hook still reports background work as
@@ -257,6 +254,41 @@ export default class Agents extends View {
     return div().size(7).mx(3).flex_none().rounded(4).bg(a.status === "done" ? color : t.dim + "00");
   }
 
+  // agent-deck: Copy link on a Claude Code card, as in the Overview: a herdr-resume:// link
+  // to its session (resume.js). The id is read on click from the pid of the terminal's
+  // program and ~/.claude/sessions/<pid>.json on its machine. The icon says how it went for 2 s.
+  copyLink(address, cx) {
+    if (this.linkState?.address === address && this.linkState.state === "busy") return;
+    const mark = (state, cx) => { this.linkState = { address, state }; cx.notify(); };
+    mark("busy", cx);
+    cx.spawn(async (cx) => {
+      let id = null;
+      try {
+        let pid = terminals().find((x) => x.address === address)?.foreground?.pid;
+        if (!Number.isInteger(pid)) pid = JSON.parse((await hc(["get", address, "--json"])).stdout)?.foreground?.pid;
+        const m = machineOf(address);
+        if (Number.isInteger(pid)) {
+          const r = await hc(["exec", ...(m ? ["--on", m] : []), "--timeout", "20", "--", "sh", "-c", SESSION_OF, "sh", String(pid)]);
+          id = sessionFrom(r.stdout);
+        }
+        if (id) cx.write_to_clipboard(resumeLink(m, id));
+      } catch {}
+      const state = id ? "copied" : "failed";
+      mark(state, cx);
+      cx.timer.after(2000, (cx) => { if (this.linkState?.address === address && this.linkState.state === state) { this.linkState = null; cx.notify(); } });
+    });
+  }
+
+  linkButton(t, address) {
+    const st = this.linkState?.address === address ? this.linkState.state : null;
+    return div().id(`ag-link-${address}`).flex_none().p(2).rounded(4).cursor_pointer()
+      .text_color(st === "copied" ? t.ansi2 ?? t.foreground : st === "failed" ? t.blocked : t.dim)
+      .hover((s) => s.bg(t.hover).text_color(t.foreground))
+      .tooltip(st === "copied" ? "Link copied" : st === "failed" ? "No session to link yet (send it a message first)" : "Copy a herdr-resume:// link to this session")
+      .on_click((_e, cx) => { cx.stop_propagation(); this.copyLink(address, cx); })
+      .child(svg("mods/agent-deck-agents/link.svg").size(12));
+  }
+
   render(cx) {
     const t = theme();
     if (props()?.sortMenu) return this.sortMenu(t);
@@ -320,8 +352,8 @@ export default class Agents extends View {
     const tabs = spaces().flatMap(s => s.tabs);
     // agent-deck: the agent's own title (Claude's chat name) wins over the tab's.
     const label = (a) => {
-      const live = clean(a.title);
-      if (live && live !== a.program?.name && !/^[~/]|^[A-Za-z]:\\/.test(live) && !live.includes("@") && live.toLowerCase() !== a.program?.key) return live;
+      const live = liveTitle(a.title, a.program);
+      if (live) return live;
       const tab = tabs.find(tab => tab.id === a.tab);
       return tab ? title(tab, lead(tab)) : a.title || a.program?.name || "";
     };
@@ -350,9 +382,13 @@ export default class Agents extends View {
           .flex_none()
           .items_center()
           .gap(4)
+          // agent-deck: the current session stands out on the rail too, as its card does when wide.
+          .mx(4)
+          .rounded(6)
+          .when(a.focused, (el) => el.bg(t.selected).border(1).border_color(t.accent))
           .hover((s) => s.bg(t.hover))
           .on_click(() => run("pane.focus", { pane: a.pane }))
-          .child(div().flex_1().min_w(0).whitespace_nowrap().text_right().text_color(t.muted).child(String(i + 1)))
+          .child(div().flex_1().min_w(0).whitespace_nowrap().text_right().text_color(a.focused ? t.foreground : t.muted).when(a.focused, (el) => el.font_semibold()).child(String(i + 1)))
           .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true))));
       }
       const when = this.since(a);
@@ -411,6 +447,8 @@ export default class Agents extends View {
             })).child(pic)))
           .child(div().flex_1().min_w(0).truncate().font_semibold().text_color(idle ? t.muted : t.foreground).child(name))
           .when(subs.length > 0, el => el.child(fold(a, subs)))
+          // agent-deck: Copy link (Claude Code only), on hover or while it says how it went.
+          .when(a.program?.key === "claude" && (this.hovered === a.address || this.linkState?.address === a.address), el => el.child(this.linkButton(t, a.address)))
           .when(this.hovered === a.address, el => el.child(pin))
           .when(this.hovered !== a.address && Boolean(when), el => el.child(div().flex_none().text_size(11).text_color(t.dim).child(duration(now - when))))
           .child(this.status(t, a, byPriority && !isPinned)))
@@ -559,16 +597,18 @@ export default class Agents extends View {
                   .child(svg("mods/workspace-chrome/search.svg").size(14)),
               ),
           )
-          // Herdr's rail control: only on the rail.
-          .when(collapsed, (el) => el.child(
+          // Herdr's rail control. agent-deck: on the wide sidebar too, as « (narrow) and » (back).
+          .child(
             div()
               .id("collapse")
               .text_size(13)
               .text_color(t.dim)
+              .cursor_pointer()
               .hover((s) => s.text_color(t.foreground))
               .on_click(toggleSidebar)
-              .child("»"),
-          )),
+              .tooltip(collapsed ? "Widen the Agents column" : "Narrow the Agents column")
+              .child(collapsed ? "»" : "«"),
+          ),
       );
   }
 }

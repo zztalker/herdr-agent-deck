@@ -1,6 +1,10 @@
 """python3 -m unittest -v test_agent_deck_resume  (from this folder)"""
 
 import json
+import os
+import subprocess
+import tempfile
+import time
 import unittest
 
 import agent_deck_resume as r
@@ -120,6 +124,39 @@ class Resume(unittest.TestCase):
     def test_missing_session(self):
         with self.assertRaisesRegex(r.LinkError, "not found"):
             r.resume(f"herdr-resume://devbox/{A}", Fake(folder=None), TOOLS)
+
+
+class Sessions(unittest.TestCase):
+    """The real SESSIONS script, on a fake home."""
+
+    def test_a_running_session_counts_under_its_parents_pid_too(self):
+        # A local terminal's program is Herdr's shell wrapper (fish -lic 'command claude; exec fish'):
+        # its pid is claude's parent's.
+        parent = subprocess.Popen(["sh", "-c", "sleep 30; true"])
+        try:
+            kid = ""
+            for _ in range(50):
+                kid = subprocess.run(["sh", "-c", f"ps -A -o pid= -o ppid= | awk -v p={parent.pid} '$2==p{{print $1}}'"],
+                                     capture_output=True, text=True).stdout.strip()
+                if kid:
+                    break
+                time.sleep(0.02)
+            child = int(kid)
+            with tempfile.TemporaryDirectory() as home:
+                os.makedirs(os.path.join(home, ".claude", "sessions"))
+                with open(os.path.join(home, ".claude", "sessions", f"{child}.json"), "w") as f:
+                    json.dump({"pid": child, "sessionId": A}, f)
+                with open(os.path.join(home, ".claude", "sessions", "999999.json"), "w") as f:
+                    json.dump({"pid": 999999, "sessionId": "other"}, f)
+                out = subprocess.run(["sh", "-c", r.SESSIONS], capture_output=True, text=True,
+                                     env={"HOME": home, "PATH": os.environ["PATH"]}).stdout
+            pids = {d["pid"] for d in map(r._json, out.splitlines()) if isinstance(d, dict) and d.get("sessionId") == A}
+            self.assertEqual(pids, {parent.pid, child})
+            others = {d["pid"] for d in map(r._json, out.splitlines()) if isinstance(d, dict) and d.get("sessionId") == "other"}
+            self.assertEqual(others, {999999})
+        finally:
+            parent.kill()
+            parent.wait()
 
 
 if __name__ == "__main__":
