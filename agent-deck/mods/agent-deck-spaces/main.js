@@ -327,11 +327,14 @@ export default class Spaces extends View {
       .when(g.behind > 0, (el) => el.child(div().flex_none().text_color(t.ansi1).child(`\u2193${g.behind}`)));
   }
 
+  fill(w, t) {
+    const color = (shared("space.colors") ?? {})[w.id] ?? "ansi6";
+    return color.startsWith("#") ? color : (MARK[color] ?? t[color]);
+  }
+
   row({ w, i, g, tree }, t) {
     const on = w.active;
-    const colors = shared("space.colors") ?? {};
-    const color = colors[w.id] ?? "ansi6";
-    const fill = color.startsWith("#") ? color : (MARK[color] ?? t[color]);
+    const fill = this.fill(w, t);
     const inside = agents().filter((a) => a.space === w.id);
     const chats = inside.slice(0, MAX_CHATS);
     const shells = shellsIn(w, panes());
@@ -398,22 +401,32 @@ export default class Spaces extends View {
       .when(shells.length > MAX_CHATS, (el) => el.child(div().pl(43).text_size(11).text_color(t.dim).child(`+${shells.length - MAX_CHATS} more shells`)));
   }
 
-  // agent-deck: on the rail, resting on a space shows its wide row beside it.
+  // agent-deck: on the rail, resting on a space shows its wide row beside it. The cell itself
+  // follows herdr-app PR #286: the space's colored avatar (a branch mark for a worktree), a
+  // dot on it when the space needs you, centered.
   compact(r, t) {
-    const { w, i } = r;
+    const { w, tree } = r;
+    const speaks = glyph(w.status) === "\u25cf";
+    const mark = tree
+      ? h_flex().size(22).items_center().justify_center().child(svg("mods/workspace-chrome/branch.svg").size(13).text_color(w.active ? t.foreground : t.dim))
+      : h_flex().size(22).rounded(6).bg(this.fill(w, t)).items_center().justify_center().text_size(11).font_bold().text_color("#ffffff").child([...w.name][0]?.toUpperCase() ?? "?");
     return HoverCard.new(`space-hover-${w.id}`).anchor("left_center").open_delay(250)
       .content(v_flex().w(320).p(6).rounded(10).bg(t.popover).border(1).border_color(t.border).shadow_lg().child(this.row(r, t)))
       .trigger(h_flex()
       .id(`space-${w.id}`)
-      .h(26)
+      .mx(4)
+      .h(tree ? 30 : 34)
       .flex_none()
+      .items_center()
       .justify_center()
-      .gap(4)
-      .when(w.active, (el) => el.bg(t.raised))
-      .hover((s) => s.bg(t.hover))
+      .rounded(6)
+      .when(w.active, (el) => el.bg(t.selected))
+      .when(!w.active, (el) => el.hover((s) => s.bg(t.hover)))
+      .cursor_pointer()
       .on_click(() => run("space.select", { id: w.id }))
-      .child(div().text_color(w.active ? t.foreground : t.muted).child(String(i + 1)))
-      .child(div().text_color(tone(t, w.status)).child(glyph(w.status))));
+      .on_mouse_down("right", () => this.menu(w))
+      .child(div().relative().flex_none().child(mark)
+        .when(speaks, (el) => el.child(div().absolute().top(-3).right(-3).size(9).rounded_full().border(2).border_color(t.chrome).bg(tone(t, w.status))))));
   }
 
   render() {
@@ -432,11 +445,13 @@ export default class Spaces extends View {
     }
     if (changed) setShared("space.colors", kept);
     return v_flex().size_full().min_h(0).bg(t.chrome).text_size(13)
-      .child(h_flex().h(31).pl(16).pr(10).items_center().justify_between().text_size(11.5).text_color(t.dim)
-        .when(!collapsed, el => el.child("Spaces"))
+      // agent-deck: centered on the rail, as in herdr-app PR #286.
+      .child(h_flex().h(31).flex_none().items_center().text_size(11.5).text_color(t.dim)
+        .when(collapsed, el => el.justify_center())
+        .when(!collapsed, el => el.pl(16).pr(10).justify_between().child("Spaces"))
         .child(div().id("space-new").size(26).flex_none().flex().items_center().justify_center().rounded(6).hover(s => s.bg(t.hover).text_color(t.foreground))
-          .on_click(() => run("space.new")).child(svg("mods/workspace-chrome/plus.svg").size(14))))
-      .child(v_flex().flex_1().min_h(0).px(8).pb(14).overflow_y_scrollbar().mode("always")
+          .tooltip("New space").on_click(() => run("space.new")).child(svg("mods/workspace-chrome/plus.svg").size(14))))
+      .child(v_flex().flex_1().min_h(0).px(collapsed ? 0 : 8).pb(14).gap(collapsed ? 2 : 0).overflow_y_scrollbar().mode("always")
         .on_mouse_up("left", (_e, cx) => { this.pressed = null; cx.notify(); })
         .children(this.grouped(t, collapsed)));
   }

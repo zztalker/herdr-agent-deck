@@ -35,7 +35,7 @@ Herdr's main window rebuilt to show what every agent is doing on every machine. 
 - **Copy link on Agents cards:** resting on a Claude Code card (program key `claude`) shows a 12px link icon before the pin, as on Overview cards: `ansi2` for 2 s after a copy, `blocked` when there's no session to link yet. The rail's hover cards have it too.
 - **Sidebar footer** (69px): the shipped `workspace-chrome` footer.
 
-**Narrow rail** (under 160px wide, 76px on macOS): spaces show their number and a status glyph; agents show a number and a status mark; the focused agent's row has the `selected` background, an `accent` border (6px radius) and its number semibold in `foreground`. Resting on any row for 250ms opens its wide card to the right:
+**Narrow rail** (under 160px wide, 76px on macOS), the cells as in herdr-app [PR #286](https://github.com/herdrdev/herdr-app/pull/286), centered: a space is its 22px colored avatar (a branch mark for a worktree), 34px high (30 for a worktree), with a 9px status dot on its corner when it needs you; the active one has the `selected` background, and right-click opens its menu. The `+` above them is centered. An agent is its program's 16px icon (its number when it has none) and its status mark, 30px high, 8px radius; the focused one has the `selected` background and an `accent` border. The `«` / `»` button is 26px with a `hover` background. Resting on any row for 250ms opens its wide card to the right:
 - an agent card is 300px wide and includes its sub-agents;
 - a space card is 320px wide.
 
@@ -253,7 +253,7 @@ Runs programs and reads files:
 - With `Full text` on, typing `login` lists the sessions whose conversation mentions it, each with a line like `…fix the Login bug in auth.py…`; a word that's only in your CLAUDE.md finds nothing.
 - Picking a task in the Overview, closing it and opening it again keeps that task; the tab reads `Agents N/M`.
 - A local Claude Code session renamed with `/rename Fix login` is called `Fix login` in the tab bar and on its Agents card; reopening it from History while it runs brings it to the front.
-- `«` in the Agents footer narrows the sidebar to the rail, with the focused agent's row highlighted; `»` brings it back.
+- `«` in the Agents footer narrows the sidebar to the rail: spaces are colored letter avatars, agents their program icons, the focused agent's row highlighted; `»` brings it back.
 - `Copy link` on a Claude Code card (Overview, or resting on an Agents card) puts `herdr-resume://<machine|local>/<id>` on the clipboard; with the handler installed, `open '<that link>'` in a shell brings that session to the front.
 - `node --test history.test.mjs` passes in `mods/agent-deck-history`, `node --test resume.test.mjs` in `mods/agent-deck-overview`, and `python3 -m unittest test_agent_deck_resume` in `resume-link/`.
 - `herdr-app check` passes for all six mods.

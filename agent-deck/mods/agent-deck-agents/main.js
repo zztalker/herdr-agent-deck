@@ -377,18 +377,19 @@ export default class Agents extends View {
             .children(this.tree(all, a.address).map((s) => this.subRow(t, s, shown, false))))
           .trigger(h_flex()
           .id(`ag-${a.address}`)
-          .h(26)
-          .px(8)
+          // agent-deck: the rail cell follows herdr-app PR #286 (the program's icon and the
+          // status mark, centered); the current session also gets an accent border.
+          .h(30)
           .flex_none()
+          .rounded(8)
           .items_center()
-          .gap(4)
-          // agent-deck: the current session stands out on the rail too, as its card does when wide.
-          .mx(4)
-          .rounded(6)
+          .justify_center()
+          .gap(3)
           .when(a.focused, (el) => el.bg(t.selected).border(1).border_color(t.accent))
-          .hover((s) => s.bg(t.hover))
+          .when(!a.focused, (el) => el.hover((s) => s.bg(t.hover)))
+          .cursor_pointer()
           .on_click(() => run("pane.focus", { pane: a.pane }))
-          .child(div().flex_1().min_w(0).whitespace_nowrap().text_right().text_color(a.focused ? t.foreground : t.muted).when(a.focused, (el) => el.font_semibold()).child(String(i + 1)))
+          .child(pic ?? div().w(16).flex_none().text_center().text_size(11).text_color(a.focused ? t.foreground : t.muted).child(String(i + 1)))
           .child(h_flex().w(14).flex_none().items_center().justify_center().child(this.status(t, a, true))));
       }
       const when = this.since(a);
@@ -561,7 +562,7 @@ export default class Agents extends View {
             .child(svg(`mods/workspace-chrome/chevron-${spacesHidden() ? "right" : "down"}.svg`).size(12)),
         ),
       )
-      .child(v_flex().id("ag-list").flex_1().min_h(0).px(collapsed ? 0 : 8).overflow_y_scrollbar().mode("always").children(rows))
+      .child(v_flex().id("ag-list").flex_1().min_h(0).px(collapsed ? 4 : 8).when(collapsed, (el) => el.pt(6).gap(2)).overflow_y_scrollbar().mode("always").children(rows))
       .child(
         h_flex()
           .h(28)
@@ -599,12 +600,19 @@ export default class Agents extends View {
           )
           // Herdr's rail control. agent-deck: on the wide sidebar too, as « (narrow) and » (back).
           .child(
+            // agent-deck: a 26px button as in herdr-app PR #286, keeping the « / » marks.
             div()
               .id("collapse")
+              .size(26)
+              .flex()
+              .flex_none()
+              .items_center()
+              .justify_center()
+              .rounded(6)
               .text_size(13)
-              .text_color(t.dim)
+              .text_color(t.muted)
               .cursor_pointer()
-              .hover((s) => s.text_color(t.foreground))
+              .hover((s) => s.bg(t.hover).text_color(t.foreground))
               .on_click(toggleSidebar)
               .tooltip(collapsed ? "Widen the Agents column" : "Narrow the Agents column")
               .child(collapsed ? "»" : "«"),
