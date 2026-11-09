@@ -2,6 +2,11 @@
 
 What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 
+## 2026-11-09
+
+### Added
+- **Labels in pane headers** (new `agent-deck-pane` mod, a clone of the shipped `pane`): a terminal's own labels show at the right end of its pane's top line, styled like the Overview's chips (name dimmed, value bright, tooltip `key=value`). Tests: `agent-deck-pane/labels.test.mjs`.
+
 ## 2026-11-06
 
 History search and resume links follow the design of Martin Krcho's Herdr setup ([GitHub](https://github.com/martinkrcho) · [LinkedIn](https://www.linkedin.com/in/martinkrcho/)): an index of Claude Code transcripts kept on each machine, `claude --resume` to reopen, and the `herdr-resume://<machine>/<session-id>` link format, so links work with either handler. Thank you, Martin. The code here is agent-deck's own implementation.

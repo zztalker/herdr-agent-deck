@@ -42,6 +42,8 @@ The cards use `popover` background, `border` and `shadow_lg`.
 
 **Main area:** the tab bar (42px), panes, a `files`/`changes` panel (368px) and the `workspace-status` bar (28px). These are Herdr's main layout, except that the tab bar is `agent-deck-tabs`: the shipped `tabs` with a 26px tag button left of `+` (Lucide `tag`, 14px, `dim`; `border` color when no terminal is focused). Its tooltip lists the focused terminal's own labels (`Labels: role=lead · task=PROJ-1`), or says `Add labels (role, task…)`.
 
+**Pane header** (`agent-deck-pane`): Herdr's shipped pane header, plus the terminal's own labels (not `where`, not `herdr.*`, not empty) right-aligned after the folder, before the status mark and the hover buttons. They're chips like the Overview's, sorted by key: `key` in `dim`, the value in `foreground`, 10.5px, `chrome` background, `border`, each cut at 220px (tooltip `key=value`), 480px at most for all of them; the folder shrinks first.
+
 **Label editor** (`agent-deck-labels`): a dialog 560px wide, `popover` background, 16px padding.
 - **Header:** tag icon, `Labels`, then `<chat or program name> · <address>` in `dim`.
 - **Rows:** `Role` and `Task` always (a 64px label, then a 28px field with the `accent` border while focused); then one row per other label the terminal has: a 120px key field, the value field and a `×`.
@@ -139,8 +141,9 @@ The task menu filters too: a card shows only if its terminal's `task` label is t
 
 ## Built from
 
-- **`layouts/agent-deck.json`:** a clone of Herdr's `main` layout with `spaces` → `agent-deck-spaces`, `agents` → `agent-deck-agents` and `tabs` → `agent-deck-tabs`.
+- **`layouts/agent-deck.json`:** a clone of Herdr's `main` layout with `spaces` → `agent-deck-spaces`, `agents` → `agent-deck-agents`, `tabs` → `agent-deck-tabs` and the pane header `pane` → `agent-deck-pane`.
 - **`mods/agent-deck-tabs`:** `mod.clone` of the shipped `tabs` (Herdr 0.1.13, `cloned_from` in `mod.json`). It adds `labelButton(t, button)`: the tag button before `+`, from `focused().terminal` and that terminal's `labels` in `terminals()`, opening `openOverlay({ mod: "agent-deck-labels", kind: "dialog", width: 560, props: { terminal } })`.
+- **`mods/agent-deck-pane`:** `mod.clone` of the shipped `pane` (Herdr 0.1.14, `cloned_from` in `mod.json`). It reads the pane's terminal's `labels` from `terminals()` and adds the chips after the folder. `labels.js` (no imports): `headerLabels(labels)`, the `[key, value]` pairs to show. Tests: `labels.test.mjs`.
 - **`mods/agent-deck-history`:** new, `mod.json` overlay `{ kind: "dialog", width: 720, height: 0.7 }`.
   - `history.js` (no imports, node-tested in `history.test.mjs`): `SCAN` (the per-machine scan), `parseScan`, `parseLink`, `search(rows, query, limit = 50)`, `recent(rows, n)`, `shortPath`, `resumeLink`, `SESSIONS` / `sessionPids` (running sessions), `NEAREST` (nearest existing folder) and `openPlan(spaces, row, folder)` (the `tab.new` / `space.new` to run).
   - `SCAN`: `stat` (GNU, else BSD) lists every `~/.claude/projects/*/*.jsonl` with its change time and size; ones not in `~/.cache/agent-deck-history/index.tsv` are read with `grep -oE` for `cwd` (first), `timestamp` (last), `customTitle` / `aiTitle` and `entrypoint` (`sdk-*` is left out), each row appended to the index at once; then the index is tidied to the last row of each file that still exists. Then `live<TAB>id` for each session file whose pid runs (`kill -0`).
@@ -178,7 +181,7 @@ The task menu filters too: a card shows only if its terminal's `task` label is t
   - `machineNames()`: this computer, then every machine with a space or in `hc machine ls`, sorted; used by `render` and by `measure`.
   - `labels.js` (no imports): `customLabels` (chips), `taskOf`, `taskMatches(labels, filter)` (`null` all, `NO_TASK` none), `taskCounts(terminals)`. Tests: `labels.test.mjs`. The task menu is a `Popup` (from `gpui-base`) whose content is filled only while it's open. Tag icons call `openOverlay` for `agent-deck-labels`.
 - **`keys.json`:** `global` → `cmd-shift-o`.
-- **Shipped mods used as-is:** `workspace-chrome` (also its SVG icons: server, monitor, layers, x, plus, chevron-down/right, pin, pin-off, branch, spinner, clock, check, search), `pane`, `files`, `changes`, `workspace-status`.
+- **Shipped mods used as-is:** `workspace-chrome` (also its SVG icons: server, monitor, layers, x, plus, chevron-down/right, pin, pin-off, branch, spinner, clock, check, search), `files`, `changes`, `workspace-status`.
 
 Runs programs and reads files:
 - `hc` (read-only: `machine ls`, `read`).
@@ -240,7 +243,8 @@ Runs programs and reads files:
 - Emptying Task and saving removes `task` from `hc get <t>`; Cancel writes nothing.
 - With two agents on `task=PROJ-1` and one on `PROJ-2`, the task menu lists `PROJ-1 2`, `PROJ-2 1`; picking `PROJ-1` leaves those two on both tabs and the tab reads `Agents 2/N`.
 - Clicking an agent card's tag icon opens the editor and does not go to the agent.
-- `node --test edit.test.mjs` passes in `mods/agent-deck-labels`, and `node --test labels.test.mjs usage.test.mjs` in `mods/agent-deck-overview`.
+- `node --test edit.test.mjs` passes in `mods/agent-deck-labels`, `node --test labels.test.mjs usage.test.mjs` in `mods/agent-deck-overview`, and `node --test labels.test.mjs` in `mods/agent-deck-pane`.
+- After `hc label <t> role=lead task=PROJ-1`, that terminal's pane header shows `role lead` and `task PROJ-1` chips at its right end; `hc label <t> role= task=` removes them.
 - The search icon in the Agents footer opens History; with an empty box it lists recent past sessions from every connected machine, none of them running now.
 - Typing a word from an old session's title on devbox lists it with `devbox · ~/…`; Enter opens a new tab on devbox running `claude --resume <id>` in that folder.
 - Searching for a session that is running shows it marked `running`; opening it brings its terminal to the front instead of starting a second copy.

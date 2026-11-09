@@ -114,7 +114,7 @@
                 "pane": {
                   "header": {
                     "content": {
-                      "mod": "pane"
+                      "mod": "agent-deck-pane"
                     },
                     "reveal": "always",
                     "height": 30,

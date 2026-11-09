@@ -2,7 +2,7 @@
 
 A [Herdr](https://herdr.dev) layout: [`agent-deck`](agent-deck/RECIPE.md).
 
-It shows every agent and terminal on every machine. Space rows list their chats, shells and running programs. Agents are cards, and hover cards work on the narrow rail. An Overview board (`⌘⇧O`) has one lane per agent state and one lane per machine for terminals, with each terminal's command and last output lines; its `Usage` button shows each machine's CPU, memory and disk use. Agents can carry labels (role, task, anything): they show as chips on the Overview's cards, a tag button beside `+` in the tab bar (or on any agent card) edits them with suggestions, and a task menu filters the Overview to one task. History (the search icon beside the Overview icon) finds past Claude Code sessions on every machine and reopens them; `herdr-resume://` links reopen a session from anywhere on your Mac.
+It shows every agent and terminal on every machine. Space rows list their chats, shells and running programs. Agents are cards, and hover cards work on the narrow rail. An Overview board (`⌘⇧O`) has one lane per agent state and one lane per machine for terminals, with each terminal's command and last output lines; its `Usage` button shows each machine's CPU, memory and disk use. Agents can carry labels (role, task, anything): they show as chips on the Overview's cards and at the right of each pane's header, a tag button beside `+` in the tab bar (or on any agent card) edits them with suggestions, and a task menu filters the Overview to one task. History (the search icon beside the Overview icon) finds past Claude Code sessions on every machine and reopens them; `herdr-resume://` links reopen a session from anywhere on your Mac.
 
 ![Overview: agents](agent-deck/preview.png)
 
@@ -28,6 +28,6 @@ Changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License
 
-Apache-2.0 (see `LICENSE`). `agent-deck-agents`, `agent-deck-spaces` and `agent-deck-tabs` are modified from Herdr's shipped `agents`, `spaces` and `tabs` mods (Apache-2.0). The changes are marked `agent-deck:` in the source. `agent-deck-labels/tag.svg` and `agent-deck-overview/link.svg` are Lucide icons (ISC).
+Apache-2.0 (see `LICENSE`). `agent-deck-agents`, `agent-deck-spaces`, `agent-deck-tabs` and `agent-deck-pane` are modified from Herdr's shipped `agents`, `spaces`, `tabs` and `pane` mods (Apache-2.0). The changes are marked `agent-deck:` in the source. `agent-deck-labels/tag.svg` and `agent-deck-overview/link.svg` are Lucide icons (ISC).
 
 History search and resume links follow the design of [Martin Krcho](https://github.com/martinkrcho)'s Herdr setup ([LinkedIn](https://www.linkedin.com/in/martinkrcho/)), including its `herdr-resume://` link format; the code is agent-deck's own.
