@@ -20,7 +20,12 @@ Ask an agent in Herdr to add `github.com/zztalker/herdr-agent-deck/tree/main/age
 
 **Resume links (macOS, optional):** run `resume-link/install.sh` so a click on a `herdr-resume://` link (Copy link in History, or on a Claude Code card in the Agents column or the Overview) opens that session in Herdr.
 
-**Waiting:** agents at rest whose background shells still run (Claude Code's `run_in_background`) show as Waiting, in the Overview's Working lane. That needs the Claude Code hook from [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) and an hc with `hc report` ([herdrdev/herdr-core#81](https://github.com/herdrdev/herdr-core/pull/81)); its `agents-waiting` mod isn't needed with this layout.
+**Agent hooks (optional):** two things need the hooks from [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) and an hc with `hc report` ([herdrdev/herdr-core#81](https://github.com/herdrdev/herdr-core/pull/81); until it's released, [herdr-core 0.1.21 + hc report](https://github.com/zztalker/herdr-core/releases/tag/0.1.21-report.1)):
+
+- **Waiting:** agents at rest whose background shells still run (Claude Code's `run_in_background`) show as Waiting, in the Overview's Working lane.
+- **Cursor:** Cursor Agent CLI reports no status of its own, so without its hook a Cursor pane is a program, not an agent; with it, Cursor is an agent card like any other.
+
+On every machine where Claude Code or Cursor runs, `sh agent-waiting/hooks/install.sh` from that repo installs the hook of each agent it finds and says so if hc has no `hc report` (Windows, Cursor: `agent-waiting\hooks\install.ps1`). Its `agents-waiting` mod isn't needed with this layout.
 
 What it runs: `hc machine ls` and `hc read` (read-only). When you press `Usage`, `hc exec` runs a short read-only `sh` script on each machine (`/proc`, `top`/`vm_stat`, `df`). While History is open, `hc exec` runs a read-only scan of `~/.claude/projects` on each machine, keeping its own cache in `~/.cache/agent-deck-history/`; Copy link reads `~/.claude/sessions/<pid>.json`. It also runs `git` in each space's folder, on its machine (inherited from Herdr's Spaces). The writes outside that cache: `hc label` when you save in the label editor, and the task colors you pick there (`agent-deck.task-colors` in Herdr's `shared.json`). No network.
 

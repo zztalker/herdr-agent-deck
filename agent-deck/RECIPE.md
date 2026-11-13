@@ -87,6 +87,7 @@ The cards use `popover` background, `border` and `shadow_lg`.
 - **done:** blue, until you look at it; then it is idle.
 - **idle:** a grey ring or dot, with dimmed names.
 - **waiting:** an `idle` agent whose 7501 record `bg` is `working`: a slow grey spinner (2.4 s a turn) in its own Waiting section, and in the Overview's Working lane. A `done` agent stays done until you look at it, whatever its records say. The `bg` record comes from a hook, such as the Claude Code hook in [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) (needs an hc with `hc report`, [herdrdev/herdr-core#81](https://github.com/herdrdev/herdr-core/pull/81)). Without it no agent waits and nothing changes.
+- **Cursor:** Cursor Agent CLI reports no status (no OSC 7501), so Herdr shows its pane as a program. The Cursor hook in the same repo reports its idle, working and done with `hc report …:app=cursor`, and it is listed like any other agent, with Cursor's icon from Herdr's program table. Its installer, `agent-waiting/hooks/install.sh`, puts in the hook of each agent it finds (Claude Code, Cursor) on the machine it runs on.
 
 **Clicks:**
 - An agent card or row focuses its pane.
@@ -233,6 +234,7 @@ Runs programs and reads files:
 - Two Claude Code agents in one space show their chat names under the space row, with status counts on it.
 - A blocked agent turns its space count red, lands in the Needs you lane and has a red card border in the Overview.
 - On an idle agent `t5`, `hc report state=working:id=bg --terminal t5` moves it to Waiting in the sidebar and into the Overview's Working lane (`waiting`); `state=clear:id=bg` moves it back to Idle. On an unseen done agent, the same report leaves it in Done.
+- With the Cursor hook installed, a `cursor-agent` started in a space is an agent card with Cursor's icon, idle; a prompt makes it working, its answer done.
 - `make test` running in a shell shows `1 shell · 1 busy` on the space and a `make test` card marked `running` with its last 2 output lines under Terminals.
 - With the sidebar dragged under 160px, resting on an agent number shows its card to the right within about ¼ second; clicking it focuses the agent.
 - A terminal started with `hc run --bg` outside Herdr (in no space) shows on its machine lane as `hidden`; clicking it peeks.

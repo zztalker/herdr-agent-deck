@@ -2,6 +2,11 @@
 
 What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 
+## 2026-11-12
+
+### Changed
+- **Cursor agents:** the README and recipe point to the Cursor hook now shipped in [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) ([`1a34c00`](https://github.com/zztalker/herdr-agent-waiting-mod/commit/1a34c00)). With it a Cursor Agent CLI pane is an agent card (status, Cursor's icon), not a program. Its one installer, `agent-waiting/hooks/install.sh`, installs the Claude Code (Waiting) and Cursor hooks for whichever agents a machine has, and warns when hc has no `hc report`; the hc build to use is now [0.1.21-report.1](https://github.com/zztalker/herdr-core/releases/tag/0.1.21-report.1). No mod code changed.
+
 ## 2026-11-09
 
 ### Added
