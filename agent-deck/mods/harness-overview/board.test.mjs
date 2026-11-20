@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -101,4 +101,85 @@ test("matches: every typed word appears in the card, its tasks or its sessions",
   assert.equal(matches(["merges"], i), true);
   assert.equal(matches(["iaid"], i), false);
   assert.equal(matches([], i), true);
+});
+
+// --- links in card text ------------------------------------------------------------------
+
+const S = [{ address: "vm/t2", status: "blocked" }, { address: "box/t7", status: null }];
+
+test("linkify: bare URLs become links; markdown links and autolinks stay as they are", () => {
+  assert.equal(linkify("see https://x.io/a/1, then [brief](https://c.ai/b) or <https://y.io>", []),
+    "see <https://x.io/a/1>, then [brief](https://c.ai/b) or <https://y.io>");
+  assert.equal(linkify("(https://x.io/a)", []), "(<https://x.io/a>)");
+});
+
+test("linkify: session addresses the card names become session: links, in code or not", () => {
+  assert.equal(linkify("**`vm/t2`** asks; box/t7 is gone", S),
+    "**[vm/t2](session:vm/t2)** asks; [box/t7](session:box/t7) is gone");
+});
+
+test("linkify: a bare tN only when exactly one listed session ends with it", () => {
+  assert.equal(linkify("answer in t2", S), "answer in [t2](session:vm/t2)");
+  assert.equal(linkify("answer in t2", [...S, { address: "other/t2" }]), "answer in t2");
+  assert.equal(linkify("t22 and xt2 and t2b", S), "t22 and xt2 and t2b");
+});
+
+test("linkify: another name for a listed session's machine (host alias) links when its tN is unique", () => {
+  assert.equal(linkify("`host-alias/t2` asks", S), "[host-alias/t2](session:vm/t2) asks");
+  assert.equal(linkify("other/t9 too", S), "other/t9 too");
+});
+
+test("linkify: never inside a link's text or URL", () => {
+  assert.equal(linkify("[vm/t2 log](https://x.io/vm/t2)", S), "[vm/t2 log](https://x.io/vm/t2)");
+});
+
+test("cutMarkdown: short text whole; long text cut on visible length, never inside a link or code", () => {
+  assert.deepEqual(cutMarkdown("short", 10), { text: "short", cut: false });
+  const long = "aaaa [the brief](https://very.long/url/that/does/not/count) bbbb `code here` cccc";
+  assert.deepEqual(cutMarkdown(long, 8), { text: "aaaa [the brief](https://very.long/url/that/does/not/count)…", cut: true });
+  assert.deepEqual(cutMarkdown(long, 22), { text: "aaaa [the brief](https://very.long/url/that/does/not/count) bbbb `code here`…", cut: true });
+  assert.equal(cutMarkdown(long, 999).cut, false);
+});
+
+// --- task filter ---------------------------------------------------------------------------
+
+const TD = {
+  sections: [{ column: "Decide", items: [item("Decide", "D1", { tasks: ["b", "a"] }), item("Decide", "D2")] }],
+  tasks: [{ task: "a", column: "Active", sessions: [] }, { task: "c", column: "Closed", sessions: [] }],
+  batches: [{ sent: "s", status: "waiting", entries: [], tasks: ["a"] }],
+  blocked: [{ address: "vm/t1", task: "b" }],
+};
+
+test("taskOptions: every task once, sorted, with how many cards carry it; then how many carry none", () => {
+  assert.deepEqual(taskOptions(TD), { tasks: [["a", 3], ["b", 2], ["c", 1]], none: 1 });
+  assert.deepEqual(taskOptions({}), { tasks: [], none: 0 });
+});
+
+test("keepTask: null keeps all, NO_TASK keeps cards without a task, a name keeps its cards", () => {
+  const d1 = TD.sections[0].items[0], d2 = TD.sections[0].items[1];
+  assert.equal(keepTask(null, d2), true);
+  assert.equal(keepTask("a", d1), true);
+  assert.equal(keepTask("c", d1), false);
+  assert.equal(keepTask(NO_TASK, d2), true);
+  assert.equal(keepTask(NO_TASK, d1), false);
+  assert.equal(keepTask("a", TD.tasks[0]), true);      // a task card is its own task
+  assert.equal(keepTask("a", TD.batches[0]), true);    // a batch by its tasks
+  assert.equal(keepTask("b", TD.blocked[0]), true);    // a blocked session by its task
+});
+
+// --- the drafts dialog -----------------------------------------------------------------------
+
+test("draftGroups: notes grouped by card in first-seen order, titled by id or name or key", () => {
+  const draft = [
+    { nid: "1", qkey: "Decide|D1", id: "D1", column: "Decide", group: "Perf", excerpt: "Cache: A or B", text: "B", at: "10:00" },
+    { nid: "2", qkey: "followup|s1|R1", name: "R1", where: "On review", text: "and?", at: "10:01" },
+    { nid: "3", qkey: "Decide|D1", id: "D1", column: "Decide", text: "soon", at: "10:02" },
+    { nid: "4", qkey: "FYI|https://x.io/1", id: null, key: "https://x.io/1", column: "FYI", text: "ok", at: "10:03" },
+  ];
+  assert.deepEqual(draftGroups(draft).map((g) => [g.qkey, g.title, g.where, g.excerpt, g.notes.map((n) => n.nid)]), [
+    ["Decide|D1", "D1", "Decide · Perf", "Cache: A or B", ["1", "3"]],
+    ["followup|s1|R1", "R1", "On review", "", ["2"]],
+    ["FYI|https://x.io/1", "https://x.io/1", "FYI", "", ["4"]],
+  ]);
+  assert.deepEqual(draftGroups(undefined), []);
 });

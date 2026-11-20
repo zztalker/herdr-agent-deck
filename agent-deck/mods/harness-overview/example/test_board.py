@@ -49,6 +49,17 @@ class ExampleBoard(unittest.TestCase):
         _, d = self.run_board("json")
         self.assertEqual(self.item(d, "Decide|D1")["draft"], [])
 
+    def test_draft_edit_changes_the_text(self):
+        self.run_board("draft", "add", "Decide|D1", "go with B")
+        _, d = self.run_board("json")
+        nid = d["draft"][0]["nid"]
+        rc, res = self.run_board("draft", "edit", nid, "go with A")
+        self.assertEqual((rc, res["ok"]), (0, True))
+        _, d = self.run_board("json")
+        self.assertEqual([n["text"] for n in d["draft"]], ["go with A"])
+        rc, res = self.run_board("draft", "edit", "nope", "x")
+        self.assertEqual((rc, res["ok"]), (1, False))
+
     def test_answer_sends_that_card_only(self):
         self.run_board("draft", "add", "Decide|D2", "later")
         rc, res = self.run_board("answer", "Decide|D1", "go with B")

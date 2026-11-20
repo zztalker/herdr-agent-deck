@@ -58,11 +58,11 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 | --- | --- |
 | `qkey` | Unique key; the buttons pass it back as `KEY`. |
 | `id`, `group` | Title line: the id in bold, the group dimmed (the group alone when there's no id). |
-| `text` | Markdown; marks are dropped, links keep their text. Long text folds behind "more". |
+| `text` | Markdown, shown as such. Links, bare URLs and the card's session addresses are clickable (a session goes to it; so does `tN` or `other-name/tN` when exactly one listed session ends in `/tN`). Long text folds behind "more". |
 | `age`, `due`, `rec` | Optional: "16h" at the right, a `due 2026-01-07` chip, a `★ recommendation` line. |
 | `tasks` | Task names, as chips. |
 | `sessions` | `[{ "address": "vm/t2", "status": "blocked" }]`: chips colored by status; a running one (status set) is a button that goes to that session. |
-| `links` | URLs, opened in the browser. |
+| `links` | URLs, opened in the browser; shown as chips only when the text doesn't already contain them. |
 | `question` | Status of a question you sent about it: `waiting`, `answered`, `ok-sent`, `accepted`. |
 | `draft` | Your saved notes on it: `[{ "nid": "…", "text": "…" }]`, each with ✕. |
 
@@ -72,17 +72,25 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 
 **blocked**: sessions waiting on a dialog, shown on top of In progress.
 
-The filter box matches every word against ids, groups, text, tasks, sessions and answers.
+The filter box matches every word against ids, groups, text, tasks, sessions and answers. The **Task** drop-list (All, each task with its number of cards, No task) shows one task's cards: queue cards and batches by their `tasks`, task cards and blocked sessions by their `task`. The pick is remembered.
+
+**note** (a draft; in `draft` and on cards): `{ "nid", "qkey", "text", "at" }`, plus for the Drafts dialog's titles `id` or `name` (else `key`), `column` or `where`, `group` and `excerpt` (all optional).
+
+**Drafts dialog** (the `Drafts (N)` button): every draft by card, with ✎ (edit), ✕, `Send this card` per card and `Send all`.
 
 ### The button commands
 
 | Button | Runs | Should |
 | --- | --- | --- |
 | Save draft | `draft add KEY TEXT` | keep a note for that card |
+| ✎ then Save (Drafts dialog) | `draft edit NID TEXT` | change its text |
 | ✕ on a draft | `draft del NID` | delete it |
 | Send (in the answer box) | `answer KEY [TEXT]` | send that card's drafts plus TEXT now; leave other drafts alone |
-| Send draft (N) | `send` | send every draft |
+| Send this card (Drafts dialog) | `answer KEY` | send that card's drafts |
+| Send all (Drafts dialog) | `send` | send every draft |
 | OK | `ok SENT` | accept that batch's answer |
+
+Commands for keys: `harness-overview.drafts` toggles the Drafts dialog, `harness-overview.refresh` rereads, `harness-overview.task <name>` / `harness-overview.task` pick a task / all.
 
 Each prints `{ "ok": true, … }` or `{ "ok": false, "error": "…" }`. After **Send** the page says "not pinged" when the reply has `"pinged": false`.
 

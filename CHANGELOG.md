@@ -5,6 +5,7 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 ## 2026-11-20
 
 ### Added
+- **Harness board: clickable links, task filter, Drafts dialog.** Card text (questions, answers, task states too) is markdown with clickable links: links, bare URLs, and session addresses that go to the session. Link chips show only links the text lacks. A `Task` drop-list shows one task's cards (remembered). `Drafts (N)` opens a dialog listing every draft by card: edit (`draft edit NID TEXT`), delete, send one card's or all. Keys can name `harness-overview.drafts`, `.refresh`, `.task <name>`.
 - **Harness board** (new `harness-overview` mod, `⌘⇧H`, and a board icon beside the Overview icon in the Agents footer): four columns (Needs you, Reviews, In progress with blocked sessions, Questions) filled by a script you name in `~/.config/herdr-app/data/harness-overview/config.json`, outside `layouts/` and `mods/` so it never travels with them. Answer a card from the board: **Send** sends it now, **Save draft** keeps it; **OK** accepts an answer, **Ask more** follows one up. Without the config the page says so, shows the format and runs nothing. The format, the commands and an example script with working buttons are in [`mods/harness-overview/README.md`](agent-deck/mods/harness-overview/README.md). Tests: `harness-overview/board.test.mjs`, `harness-overview/example/test_board.py`.
 
 ## 2026-11-12

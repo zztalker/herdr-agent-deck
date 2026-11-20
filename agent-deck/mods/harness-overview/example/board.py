@@ -8,6 +8,7 @@ Every command prints one JSON object and exits 1 when its "ok" is false. The for
 
   board.py json                  the board
   board.py draft add KEY TEXT    save a draft note on a card (KEY: the card's qkey or an answer's key)
+  board.py draft edit NID TEXT  change a draft note
   board.py draft del NID         delete a draft note
   board.py answer KEY [TEXT]     send that card's drafts (+ TEXT) now
   board.py send                  send every draft as one batch
@@ -147,6 +148,13 @@ def main(argv):
         err = add(state, b, rest[1], rest[2])
         if err:
             return out({"ok": False, "error": err})
+        save(state)
+        return out({"ok": True, "count": len(state["draft"])})
+    if cmd == "draft" and rest[:1] == ["edit"] and len(rest) == 3:
+        note = next((n for n in state["draft"] if n["nid"] == rest[1]), None)
+        if not note or not rest[2].strip():
+            return out({"ok": False, "error": "unknown draft or empty text"})
+        note["text"] = rest[2].strip()
         save(state)
         return out({"ok": True, "count": len(state["draft"])})
     if cmd == "draft" and rest[:1] == ["del"] and len(rest) == 2:
