@@ -64,7 +64,7 @@ export function matches(words, x) {
 const MD_LINK = /\[[^\]]*\]\([^)]*\)|<https?:\/\/[^>\s]+>/g;
 const TOKEN = /(https?:\/\/[^\s<>()\[\]]+)|((?<![\w/.-])[\w.-]+\/t\d+[a-z]?(?![\w-]))|((?<![\w/.-])t\d+[a-z]?(?![\w-]))/g;
 
-// Markdown for TextView: bare URLs become <autolinks>; the session addresses the card lists become
+// Markdown for TextView: bare URLs become links named by shortTitle (app!183, app job N…); the session addresses the card lists become
 // `session:<address>` links (in code spans too), and a bare `tN` when exactly one of them ends in /tN.
 export function linkify(md, sessions) {
   const full = new Set((sessions ?? []).map((s) => s.address));
@@ -78,7 +78,8 @@ export function linkify(md, sessions) {
   const plainPart = (text) => text.replace(TOKEN, (m, url, addr, bare) => {
     if (url) {
       const tail = url.match(/[.,;:!?]+$/)?.[0] ?? "";
-      return `<${url.slice(0, url.length - tail.length)}>${tail}`;
+      const link = url.slice(0, url.length - tail.length);
+      return `[${shortTitle(link)}](${link})${tail}`;
     }
     const to = target(addr ?? bare);
     return to ? `[${m}](session:${to})` : m;
@@ -152,4 +153,40 @@ export function draftGroups(draft) {
     groups.get(n.qkey).notes.push(n);
   }
   return [...groups.values()];
+}
+
+// --- readable titles ---------------------------------------------------------------------------
+
+// A link as people name it: app!183 (merge request), tool#12 (PR / issue), app job N, ABC-123
+// (tracker key); else host/…/last part. Anything that isn't a URL stays as it is.
+export function shortTitle(name) {
+  const s = name ?? "";
+  let u;
+  try { u = new URL(s); } catch { return s; }
+  if (!/^https?:$/.test(u.protocol)) return s;
+  const parts = u.pathname.split("/").filter(Boolean);
+  const at = (word) => parts.indexOf(word);
+  const project = (i) => parts[(parts[i - 1] === "-" ? i - 2 : i - 1)] ?? u.host;
+  for (const [word, mark] of [["merge_requests", "!"], ["pull", "#"], ["issues", "#"]]) {
+    const i = at(word);
+    if (i > 0 && /^\d+$/.test(parts[i + 1] ?? "")) return `${project(i)}${mark}${parts[i + 1]}`;
+  }
+  for (const word of ["jobs", "pipelines"]) {
+    const i = at(word);
+    if (i > 0 && /^\d+$/.test(parts[i + 1] ?? "")) return `${project(i)} ${word.slice(0, -1)} ${parts[i + 1]}`;
+  }
+  const key = u.pathname.match(/\/browse\/([A-Z][A-Z0-9]+-\d+)/);
+  if (key) return key[1];
+  return parts.length ? `${u.host}/…/${parts[parts.length - 1]}` : u.host;
+}
+
+// Every session the board names, once: so text outside cards (question quotes) can link them too.
+export function knownSessions(data) {
+  const seen = new Map();
+  const add = (s) => { if (s?.address && !seen.has(s.address)) seen.set(s.address, s); };
+  for (const s of data?.sections ?? []) for (const i of s.items ?? []) (i.sessions ?? []).forEach(add);
+  for (const t of data?.tasks ?? []) (t.sessions ?? []).forEach(add);
+  for (const b of data?.blocked ?? []) add({ address: b.address, status: "blocked" });
+  add(data?.manager);
+  return [...seen.values()];
 }

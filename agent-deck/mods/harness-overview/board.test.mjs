@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -107,10 +107,12 @@ test("matches: every typed word appears in the card, its tasks or its sessions",
 
 const S = [{ address: "vm/t2", status: "blocked" }, { address: "box/t7", status: null }];
 
-test("linkify: bare URLs become links; markdown links and autolinks stay as they are", () => {
+test("linkify: bare URLs become links named as people name them; markdown links and autolinks stay", () => {
   assert.equal(linkify("see https://x.io/a/1, then [brief](https://c.ai/b) or <https://y.io>", []),
-    "see <https://x.io/a/1>, then [brief](https://c.ai/b) or <https://y.io>");
-  assert.equal(linkify("(https://x.io/a)", []), "(<https://x.io/a>)");
+    "see [x.io/…/1](https://x.io/a/1), then [brief](https://c.ai/b) or <https://y.io>");
+  assert.equal(linkify("(https://x.io/a)", []), "([x.io/…/a](https://x.io/a))");
+  assert.equal(linkify("job fixed https://git.example.com/g/app/-/jobs/4506831", []),
+    "job fixed [app job 4506831](https://git.example.com/g/app/-/jobs/4506831)");
 });
 
 test("linkify: session addresses the card names become session: links, in code or not", () => {
@@ -182,4 +184,35 @@ test("draftGroups: notes grouped by card in first-seen order, titled by id or na
     ["FYI|https://x.io/1", "https://x.io/1", "FYI", "", ["4"]],
   ]);
   assert.deepEqual(draftGroups(undefined), []);
+});
+
+// --- readable titles ---------------------------------------------------------------------------
+
+test("shortTitle: MRs, PRs, issues, jobs, pipelines and Jira keys by their usual short names", () => {
+  assert.equal(shortTitle("https://git.example.com/group/sub/app/-/merge_requests/183"), "app!183");
+  assert.equal(shortTitle("https://git.example.com/group/app/-/merge_requests/183/diffs"), "app!183");
+  assert.equal(shortTitle("https://github.com/someone/tool/pull/12"), "tool#12");
+  assert.equal(shortTitle("https://github.com/someone/tool/issues/7"), "tool#7");
+  assert.equal(shortTitle("https://git.example.com/group/app/-/issues/9"), "app#9");
+  assert.equal(shortTitle("https://git.example.com/group/app/-/jobs/4506831"), "app job 4506831");
+  assert.equal(shortTitle("https://git.example.com/group/app/-/pipelines/77"), "app pipeline 77");
+  assert.equal(shortTitle("https://tracker.example.net/browse/ABC-123"), "ABC-123");
+});
+
+test("shortTitle: other links become host + last part; plain names stay", () => {
+  assert.equal(shortTitle("https://claude.ai/artifact/2DjtR8aSpVN2uY8DLuZVvV"), "claude.ai/…/2DjtR8aSpVN2uY8DLuZVvV");
+  assert.equal(shortTitle("https://example.com/"), "example.com");
+  assert.equal(shortTitle("R3"), "R3");
+  assert.equal(shortTitle(null), "");
+});
+
+test("knownSessions: every session the board names, once (cards, tasks, blocked, manager)", () => {
+  const d = {
+    sections: [{ items: [{ sessions: [{ address: "vm/t2", status: "blocked" }, { address: "vm/t3", status: null }] }] }],
+    tasks: [{ sessions: [{ address: "vm/t2", status: "blocked" }] }],
+    blocked: [{ address: "box/t9", task: "a" }],
+    manager: { address: "box/t1", status: "idle" },
+  };
+  assert.deepEqual(knownSessions(d).map((s) => s.address), ["vm/t2", "vm/t3", "box/t9", "box/t1"]);
+  assert.deepEqual(knownSessions({}), []);
 });

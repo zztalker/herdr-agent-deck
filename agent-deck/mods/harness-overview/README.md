@@ -58,7 +58,7 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 | --- | --- |
 | `qkey` | Unique key; the buttons pass it back as `KEY`. |
 | `id`, `group` | Title line: the id in bold, the group dimmed (the group alone when there's no id). |
-| `text` | Markdown, shown as such. Links, bare URLs and the card's session addresses are clickable (a session goes to it; so does `tN` or `other-name/tN` when exactly one listed session ends in `/tN`). Long text folds behind "more". |
+| `text` | Markdown, shown as such. Links, bare URLs (named as people name them: `app!183`, `tool#12`, `app job 4506831`, `ABC-123`, else host/…/last part) and the card's session addresses are clickable (a session goes to it; so does `tN` or `other-name/tN` when exactly one listed session ends in `/tN`). Long text folds behind "more". |
 | `age`, `due`, `rec` | Optional: "16h" at the right, a `due 2026-01-07` chip, a `★ recommendation` line. |
 | `tasks` | Task names, as chips. |
 | `sessions` | `[{ "address": "vm/t2", "status": "blocked" }]`: chips colored by status; a running one (status set) is a button that goes to that session. |
@@ -68,7 +68,7 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 
 **task** (In progress; `Waiting on you` first, `Closed` left out): `task`, `title`, `state`, `column` (`Active`, `Waiting on you`, `Closed`), `sessions` (as on cards), `last` (latest log line).
 
-**batch** (Questions; `answered` first with an **OK** button, then `waiting` and `ok-sent`; `accepted` left out): `sent` (its id), `status`, `entries`: `[{ "key", "name", "where", "quote", "questions": [text], "answers": [{ "head", "body" }], "draft": [note] }]`. An entry with answers has **Ask more**, which uses its `key` as `KEY`.
+**batch** (Questions; `answered` first with an **OK** button, then `waiting` and `ok-sent`; `accepted` left out): `sent` (its id), `status`, `entries`: `[{ "key", "name", "where", "quote", "questions": [text], "answers": [{ "head", "body" }], "draft": [note] }]`. Each entry shows its `name` as its title (a URL reads as `app!183` and opens on click), an `asked from <where>` chip, its `quote` (the item as it read when asked; sessions any card names are links there), then the questions and answers. An entry with answers has **Ask more**, which uses its `key` as `KEY`.
 
 **blocked**: sessions waiting on a dialog, shown on top of In progress.
 

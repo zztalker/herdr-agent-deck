@@ -2,6 +2,11 @@
 
 What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 
+## 2026-11-21
+
+### Changed
+- **Harness board, Questions:** each question shows the item it was asked about (the quoted line, with its links and sessions clickable) and an `asked from <column>` chip. A title that is a URL reads as people name it (`app!183`, `tool#12`, `app job 4506831`, `ABC-123`) and opens on click, here and in the Drafts dialog; bare URLs in card text get the same short names. Tests: `shortTitle`, `knownSessions` in `board.test.mjs`.
+
 ## 2026-11-20
 
 ### Added

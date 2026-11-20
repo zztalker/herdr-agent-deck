@@ -14,7 +14,7 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, Popup } from "gpui-base";
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
-import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups } from "./board.js";
+import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions } from "./board.js";
 
 const SHORT = 260; // characters of a card's text before "more"
 const QS_WORD = { waiting: "question sent", answered: "answered", "ok-sent": "OK sent", accepted: "accepted" };
@@ -270,7 +270,16 @@ export default class HarnessOverview extends View {
       .when(x.sessions.length > 0, (el) => el.child(h_flex().flex_wrap().gap(4).children(x.sessions.map((s) => this.sessionChip(t, `${id}-s-${s.address}`, s)))));
   }
 
-  batchCard(t, b) {
+  // A card's title: a link reads as people name it (app!183) and opens on click; the full name on hover.
+  title(t, id, name, maxW) {
+    const isUrl = /^https?:\/\//.test(name ?? "");
+    return div().id(id).flex_shrink_1().min_w(0).max_w(maxW).truncate().font_semibold().text_size(12).text_color(isUrl ? t.accent : t.foreground)
+      .tooltip(name ?? "")
+      .when(isUrl, (el) => el.cursor_pointer().hover((s) => s.underline()).on_click((_e, cx) => { cx.stop_propagation(); this.openLink(name); }))
+      .child(shortTitle(name));
+  }
+
+  batchCard(t, b, known = []) {
     const id = `qb-${b.sent}`;
     return v_flex().id(id).flex_none().w_full().px(10).py(8).gap(6).rounded(8).bg(t.surface).border(1).border_color(b.status === "answered" ? t.done : t.border)
       .child(h_flex().gap(6).items_center()
@@ -283,11 +292,15 @@ export default class HarnessOverview extends View {
         const editing = this.edit?.key === e.key;
         return v_flex().id(eid).gap(4).pt(4).border_t(1).border_color(t.border)
           .child(h_flex().gap(6).items_center().min_w(0)
-            .child(div().flex_shrink_1().min_w(0).max_w(320).truncate().font_semibold().text_size(12).text_color(t.foreground).tooltip(e.name).child(e.name))
-            .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(e.where)))
+            .child(this.title(t, `${eid}-title`, e.name, 320))
+            .when(Boolean(e.where), (el) => el.child(this.chip(t, `${eid}-where`, `asked from ${e.where}`, t.dim)))
+            .child(div().flex_1()))
+          // The item as it read when asked: what the question is about.
+          .when(Boolean(e.quote), (el) => el.child(div().id(`${eid}-quote`).pl(8).border_l(2).border_color(t.border).text_color(t.dim)
+            .child(this.body(t, `${eid}-quote`, e.quote, known, 11))))
           .children(e.questions.map((q, n) => h_flex().id(`${eid}-q${n}`).gap(4).items_start().min_w(0)
             .child(div().flex_none().text_size(11.5).child("❓"))
-            .child(this.body(t, `${eid}-q${n}`, q, [], 11.5))))
+            .child(this.body(t, `${eid}-q${n}`, q, known, 11.5))))
           .children(e.answers.map((a, n) => v_flex().id(`${eid}-a${n}`).px(6).py(4).rounded(4).bg(t.chrome).gap(2)
             .child(div().text_size(10.5).text_color(t.done).child(plain(a.head)))
             .child(this.body(t, `${eid}-a${n}`, a.body))))
@@ -372,7 +385,7 @@ export default class HarnessOverview extends View {
         .when(groups.length === 0, (el) => el.child(div().p(8).text_size(12).text_color(t.dim).child("No drafts. Save draft under a card's answer box adds one.")))
         .children(groups.map((g, i) => v_flex().id(`dd-g-${i}`).gap(6)
           .child(h_flex().gap(8).items_center().min_w(0)
-            .child(div().flex_shrink_1().min_w(0).max_w(360).truncate().font_semibold().text_size(12).text_color(t.foreground).tooltip(g.title).child(g.title))
+            .child(this.title(t, `dd-t-${i}`, g.title, 360))
             .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(g.where))
             .child(this.btn(t, `dd-send-${i}`, this.busy === g.qkey ? "Sending…" : `Send this card (${g.notes.length})`, (cx) =>
               this.act(g.qkey, ["answer", g.qkey], cx, (r) => `Sent ${r.sent ?? g.notes.length} note(s)${r.pinged === false ? " (manager not pinged)" : ""}`),
@@ -412,6 +425,7 @@ export default class HarnessOverview extends View {
     const words = this.query.toLowerCase().split(/\s+/).filter(Boolean);
     const keep = (x) => keepTask(this.taskFilter, x) && matches(words, x);
     const c = columns(d ?? {}, keep);
+    const known = knownSessions(d);
     const blockedHere = c.blocked.filter((b) => keepTask(this.taskFilter, b) && matches(words, { ...b, tasks: [b.task], sessions: [b] }));
     const draftN = d?.draft?.length ?? 0;
     const mgr = d?.manager;
@@ -462,7 +476,7 @@ export default class HarnessOverview extends View {
       .child(this.column(t, "progress", "In progress", c.tasks.length, t.ansi2 ?? t.accent,
         [...blockedRow, ...c.tasks.map((x) => this.taskCard(t, x)), h_flex().id("fyi-row").child(fyiToggle), ...(this.showFyi ? c.fyi.map((i) => this.card(t, i)) : [])]))
       .child(this.column(t, "questions", "Questions", c.answered.length + c.waiting.length, t.done,
-        [...c.answered.map((b) => this.batchCard(t, b)), ...c.waiting.map((b) => this.batchCard(t, b))], { empty: "No open questions" })))
+        [...c.answered.map((b) => this.batchCard(t, b, known)), ...c.waiting.map((b) => this.batchCard(t, b, known))], { empty: "No open questions" })))
       .when(this.showDrafts, (el) => el.child(this.draftsDialog(t, d)));
   }
 }
