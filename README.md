@@ -2,7 +2,7 @@
 
 A [Herdr](https://herdr.dev) layout: [`agent-deck`](agent-deck/RECIPE.md).
 
-It shows every agent and terminal on every machine. Space rows list their chats, shells and running programs. Agents are cards, and hover cards work on the narrow rail. An Overview board (`⌘⇧O`) has one lane per agent state and one lane per machine for terminals, with each terminal's command and last output lines; its `Usage` button shows each machine's CPU, memory and disk use. Agents can carry labels (role, task, anything): they show as chips on the Overview's cards and at the right of each pane's header, a tag button beside `+` in the tab bar (or on any agent card) edits them with suggestions, and a task menu filters the Overview to one task. History (the search icon beside the Overview icon) finds past Claude Code sessions on every machine and reopens them; `herdr-resume://` links reopen a session from anywhere on your Mac.
+It shows every agent and terminal on every machine. Space rows list their chats, shells and running programs. Agents are cards, and hover cards work on the narrow rail. An Overview board (`⌘⇧O`) has one lane per agent state and one lane per machine for terminals, with each terminal's command and last output lines; its `Usage` button shows each machine's CPU, memory and disk use. Agents can carry labels (role, task, anything): they show as chips on the Overview's cards and at the right of each pane's header, a tag button beside `+` in the tab bar (or on any agent card) edits them with suggestions, and a task menu filters the Overview to one task. A Harness board (`⌘⇧H`, the board icon beside the Overview icon) shows the work of your agents from a script of yours (what needs you, reviews, tasks in progress, blocked sessions, questions and answers) and lets you answer a card from there; without its config it says how to set it up ([format and example script](agent-deck/mods/harness-overview/README.md)). History (the search icon beside them) finds past Claude Code sessions on every machine and reopens them; `herdr-resume://` links reopen a session from anywhere on your Mac.
 
 ![Overview: agents](agent-deck/preview.png)
 
@@ -15,7 +15,7 @@ It shows every agent and terminal on every machine. Space rows list their chats,
 Ask an agent in Herdr to add `github.com/zztalker/herdr-agent-deck/tree/main/agent-deck`, or by hand:
 
 1. Copy `agent-deck/layouts/agent-deck.json` and `agent-deck/layouts/agent-deck-preview.png` (its picture in Settings) to `~/.config/herdr-app/layouts/` and each `agent-deck/mods/*` folder to `~/.config/herdr-app/mods/`.
-2. Merge `agent-deck/keys.json` into `~/.config/herdr-app/keys.json` (it adds `cmd-shift-o`).
+2. Merge `agent-deck/keys.json` into `~/.config/herdr-app/keys.json` (it adds `cmd-shift-o` and `cmd-shift-h`).
 3. Run `herdr-app do layout.switch --name agent-deck`. `ctrl-shift-l` switches back.
 
 **Resume links (macOS, optional):** run `resume-link/install.sh` so a click on a `herdr-resume://` link (Copy link in History, or on a Claude Code card in the Agents column or the Overview) opens that session in Herdr.
@@ -27,12 +27,12 @@ Ask an agent in Herdr to add `github.com/zztalker/herdr-agent-deck/tree/main/age
 
 On every machine where Claude Code or Cursor runs, `sh agent-waiting/hooks/install.sh` from that repo installs the hook of each agent it finds and says so if hc has no `hc report` (Windows, Cursor: `agent-waiting\hooks\install.ps1`). Its `agents-waiting` mod isn't needed with this layout.
 
-What it runs: `hc machine ls` and `hc read` (read-only). When you press `Usage`, `hc exec` runs a short read-only `sh` script on each machine (`/proc`, `top`/`vm_stat`, `df`). While History is open, `hc exec` runs a read-only scan of `~/.claude/projects` on each machine, keeping its own cache in `~/.cache/agent-deck-history/`; Copy link reads `~/.claude/sessions/<pid>.json`. It also runs `git` in each space's folder, on its machine (inherited from Herdr's Spaces). The writes outside that cache: `hc label` when you save in the label editor, and the task colors you pick there (`agent-deck.task-colors` in Herdr's `shared.json`). No network.
+What it runs: `hc machine ls` and `hc read` (read-only). When you press `Usage`, `hc exec` runs a short read-only `sh` script on each machine (`/proc`, `top`/`vm_stat`, `df`). While History is open, `hc exec` runs a read-only scan of `~/.claude/projects` on each machine, keeping its own cache in `~/.cache/agent-deck-history/`; Copy link reads `~/.claude/sessions/<pid>.json`. It also runs `git` in each space's folder, on its machine (inherited from Herdr's Spaces). The Harness board runs only the command named in its config. The writes outside that cache: `hc label` when you save in the label editor, and the task colors you pick there (`agent-deck.task-colors` in Herdr's `shared.json`). No network.
 
 Changes are listed in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## License
 
-Apache-2.0 (see `LICENSE`). `agent-deck-agents`, `agent-deck-spaces`, `agent-deck-tabs` and `agent-deck-pane` are modified from Herdr's shipped `agents`, `spaces`, `tabs` and `pane` mods (Apache-2.0). The changes are marked `agent-deck:` in the source. `agent-deck-labels/tag.svg` and `agent-deck-overview/link.svg` are Lucide icons (ISC).
+Apache-2.0 (see `LICENSE`). `agent-deck-agents`, `agent-deck-spaces`, `agent-deck-tabs` and `agent-deck-pane` are modified from Herdr's shipped `agents`, `spaces`, `tabs` and `pane` mods (Apache-2.0). The changes are marked `agent-deck:` in the source. `agent-deck-labels/tag.svg`, `agent-deck-overview/link.svg` and `harness-overview/kanban.svg` are Lucide icons (ISC).
 
 History search and resume links follow the design of [Martin Krcho](https://github.com/martinkrcho)'s Herdr setup ([LinkedIn](https://www.linkedin.com/in/martinkrcho/)), including its `herdr-resume://` link format; the code is agent-deck's own.

@@ -581,9 +581,9 @@ export default class Agents extends View {
           .px(12)
           .items_center()
           .justify_between()
-          .when(collapsed, (el) => el.flex_col().h(76).gap(8).justify_center().px(0))
-          // agent-deck: the all-machines overview (cmd-shift-o; again closes it), and History:
-          // search past Claude Code sessions on every machine.
+          .when(collapsed, (el) => el.flex_col().h(98).gap(8).justify_center().px(0))
+          // agent-deck: the all-machines overview (cmd-shift-o; again closes it), the harness
+          // board (cmd-shift-h), and History: search past Claude Code sessions on every machine.
           .child(
             h_flex()
               .gap(12)
@@ -598,6 +598,17 @@ export default class Agents extends View {
                   .on_click(() => run("mod.open", { name: "agent-deck-overview" }))
                   .tooltip("Agents overview (⌘⇧O)")
                   .child(svg("mods/workspace-chrome/layers.svg").size(14)),
+              )
+              // agent-deck: the task board from your own script (the harness-overview mod).
+              .child(
+                div()
+                  .id("harness")
+                  .text_color(t.dim)
+                  .cursor_pointer()
+                  .hover((s) => s.text_color(t.foreground))
+                  .on_click(() => run("mod.open", { name: "harness-overview" }))
+                  .tooltip("Harness board (⌘⇧H)")
+                  .child(svg("mods/harness-overview/kanban.svg").size(14)),
               )
               .child(
                 div()

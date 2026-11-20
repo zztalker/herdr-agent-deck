@@ -1,5 +1,6 @@
 {
   "global": {
-    "cmd-shift-o": "mod.open:agent-deck-overview"
+    "cmd-shift-o": "mod.open:agent-deck-overview",
+    "cmd-shift-h": "mod.open:harness-overview"
   }
 }

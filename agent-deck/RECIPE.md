@@ -31,7 +31,7 @@ Herdr's main window rebuilt to show what every agent is doing on every machine. 
 - **Agents** (the other half, min 90px). Its header `Agents ⌄` rolls Spaces up (`layout.toggle {id: "spaces"}`); `Agents ›` shows it again. On the rail the same chevron sits above the list. Grouped by space, or by priority (Needs you / Done / Working / Waiting / Idle) with the sort menu. Each agent is a card (8px radius, `surface` background, `border`; focused: `selected` background and `accent` border):
   - **Line 1:** program icon, chat name (semibold), the fold chevron with sub-agent count, time in state (a pin on hover), status mark.
   - **Line 2:** chips `@machine` (`@local` here) and the space name.
-- **Agents footer** (28px): on the left a layers icon (Overview) and, 12px after it, a search icon (History); at the right `«` (tooltip `Narrow the Agents column`) narrows the sidebar to the rail. On the rail it is 76px and stacks the two icons over `»` (`Widen the Agents column`), which brings back the width it had (268px by default).
+- **Agents footer** (28px): on the left a layers icon (Overview), a board icon (Harness board) and a search icon (History), 12px apart; at the right `«` (tooltip `Narrow the Agents column`) narrows the sidebar to the rail. On the rail it is 98px and stacks the three icons over `»` (`Widen the Agents column`), which brings back the width it had (268px by default).
 - **Copy link on Agents cards:** resting on a Claude Code card (program key `claude`) shows a 12px link icon before the pin, as on Overview cards: `ansi2` for 2 s after a copy, `blocked` when there's no session to link yet. The rail's hover cards have it too.
 - **Sidebar footer** (69px): the shipped `workspace-chrome` footer.
 
@@ -51,6 +51,12 @@ The cards use `popover` background, `border` and `shadow_lg`.
 - **Suggestions:** under the focused value field, up to 8 clickable chips (11px, `chrome` background, `accent` border on hover).
 - **`+ Add label`** adds a key/value row; an error line (`blocked`) when a key is refused or `hc label` fails.
 - **Footer:** `Enter saves · Esc cancels · an empty value removes the label`, `Cancel` (bordered) and `Save` (`accent` background; `Saving…` while it runs).
+
+**Harness board** (`harness-overview`, `⌘⇧H`): a dialog 92% × 90% of the window. Its data comes from a script you name in `~/.config/herdr-app/data/harness-overview/config.json`; the format, the commands and an example script are in [`mods/harness-overview/README.md`](mods/harness-overview/README.md).
+- **Header:** `Harness`, the manager session chip, where the data came from and how old it is, a filter box, `Send draft (N)` while drafts exist, `Refresh`, ✕.
+- **Four columns** (as the Overview's lanes): **Needs you** (Urgent, then Decide cards; Urgent ones with a `blocked` border), **Reviews** (Ready to merge, then On review), **In progress** (a `Blocked sessions N` box, then tasks with `waiting on you` ones first, then an `FYI (N)` toggle), **Questions** (answered batches with `OK`, then the ones still waiting).
+- **Card:** id and group, age; text cut at 260 characters with `more`; chips for tasks, sessions (status dot; a running one goes to it) and links (open in the browser); saved drafts with ✕; `Answer` opens a 4-row box with `Send` (now, this card only), `Save draft` and `Cancel`.
+- **No config:** `No board script configured`, the file's path, the example to try, and the format.
 
 **History** (`agent-deck-history`): a dialog 720px wide, 70% of the window tall, `popover` background, 16px padding.
 - **Header:** search icon, `History`, then `N past sessions on M machines` (`Reading devbox, …` while scans run).
@@ -129,6 +135,7 @@ The task menu filters too: a card shows only if its terminal's `task` label is t
 
 **Keys and commands:**
 - `⌘⇧O` (`mod.open:agent-deck-overview`) toggles the Overview; `Esc` closes it.
+- `⌘⇧H` (`mod.open:harness-overview`) toggles the Harness board. `Esc` closes the answer box, then clears the filter, then closes the board. It reruns `<command> json` every `every` seconds (default 120) while open and not answering, and after each button; a failed run keeps the last board and says so in the header.
 - `agent-deck-overview.agents` and `agent-deck-overview.terminals` switch its tab while it's open.
 - `agent-deck-overview.usage` switches to Terminals and measures, like the button.
 - `agent-deck-overview.label` opens the label editor for the focused agent; `agent-deck-overview.tasks` opens or closes the task menu; `agent-deck-overview.task <name>` filters to that task (`task` alone: all).
@@ -153,7 +160,12 @@ The task menu filters too: a card shows only if its terminal's `task` label is t
   - `FULLTEXT` (the text as `$1`): for each transcript the index lists, `grep -v -F` drops `"type":"attachment"` and `"type":"api-request-blob"` lines, `grep -F` keeps `"type":"user"` / `"type":"assistant"` ones, then `grep -m1 -i -F --` finds the text; awk prints up to 400 characters around it. `parseHits` reads that; `snippet(raw, query, width = 60)` unescapes JSON and cuts it to whole words around the match.
   - It runs everything as `hc exec [--on m] --timeout 120 -- sh -c <script>` (argv, so a fish login shell never parses it; Herdr's `exec()` stops at 30 s).
 - **`mods/agent-deck-overview` (links):** `resume.js` (node-tested in `resume.test.mjs`): `SESSION_OF` (the pid whose session file it reads, that pid's or else a direct child's, the file, then `found` when its transcript exists), `sessionFrom(out)`, `resumeLink`; `link.svg` (Lucide). `agent-deck-agents` has copies of all three files for its cards' Copy link, plus `title.js` (`liveTitle(title, program)`, node-tested in `title.test.mjs`).
-- **`mods/agent-deck-agents` (footer):** the History icon runs `mod.open {name: "agent-deck-history"}`.
+- **`mods/agent-deck-agents` (footer):** the History icon runs `mod.open {name: "agent-deck-history"}`, the board icon `mod.open {name: "harness-overview"}`.
+- **`mods/harness-overview`:** new, `mod.json` overlay `{ kind: "dialog", width: 0.92, height: 0.9 }`.
+  - `board.js` (no imports, node-tested in `board.test.mjs`): `CONFIG_PATH`, `parseConfig(text)` (`{command, every, on}` or `null`), `shellArgs(command, args)` (`sh -c '<command> "$@"' hboard args…`, so the arguments are never re-parsed), `plain(md)`, `columns(data, keep)` and `matches(words, card)`.
+  - It reads the config with `readTextFile` on every load and runs the command with `exec("sh", …)` (90 s timeout). The last board is kept in the mod's `localStorage` and shown at once on the next open.
+  - `TextareaState` / `Textarea` (from `gpui-base`) for the answer box; `kanban.svg` is Lucide's `square-kanban` (ISC).
+  - `example/board.py` (stdlib Python): a made-up board with every command working, its state in `$BOARD_STATE` (default `~/.cache/harness-overview-example.json`). Tests: `example/test_board.py`.
 - **`resume-link/`:** `agent_deck_resume.py` (Python 3, standard library; every outside call goes through one `run(argv, timeout)`, so `test_agent_deck_resume.py` drives it with a fake) and `install.sh` (`osacompile` an AppleScript `open location` handler, copy the script into `Contents/Resources`, add `CFBundleURLTypes` for `herdr-resume`, `LSUIElement`, ad-hoc `codesign`, `lsregister -f`).
 - **`mods/agent-deck-labels`:** new, `mod.json` overlay `{ kind: "dialog", width: 560 }`.
   - It edits `props().terminal`, else `focused().terminal`; the name comes from `agents()` / `panes()` titles, else the program.
@@ -185,7 +197,7 @@ The task menu filters too: a card shows only if its terminal's `task` label is t
     - Disk: `df -P "$HOME"`'s capacity: the Data volume on macOS, `/` on a typical VM.
   - `machineNames()`: this computer, then every machine with a space or in `hc machine ls`, sorted; used by `render` and by `measure`.
   - `labels.js` (no imports): `customLabels` (chips), `taskOf`, `taskMatches(labels, filter)` (`null` all, `NO_TASK` none), `taskCounts(terminals)`. Tests: `labels.test.mjs`. The task menu is a `Popup` (from `gpui-base`) whose content is filled only while it's open. Tag icons call `openOverlay` for `agent-deck-labels`.
-- **`keys.json`:** `global` → `cmd-shift-o`.
+- **`keys.json`:** `global` → `cmd-shift-o`, `cmd-shift-h`.
 - **Shipped mods used as-is:** `workspace-chrome` (also its SVG icons: server, monitor, layers, x, plus, chevron-down/right, pin, pin-off, branch, spinner, clock, check, search), `files`, `changes`, `workspace-status`.
 
 Runs programs and reads files:
@@ -195,6 +207,7 @@ Runs programs and reads files:
 - `hc label <address> …` when Save is pressed in the label editor, and shared `agent-deck.task-colors` (in `~/.config/herdr-app/shared.json`) when a color was picked: the only writes.
 - History: `hc exec` with `SCAN` on each reachable machine while the dialog is open (reads transcripts, writes only `~/.cache/agent-deck-history/index.tsv`); `SESSIONS` and `NEAREST` when a row is opened.
 - Copy link: `hc get` (when `terminals()` lacks the pid) and `hc exec` with `SESSION_OF` on the card's machine.
+- Harness board: only the command named in its config (nothing without one), and `open` / `xdg-open` for a link you click. What that command reads and writes is up to it.
 - No network.
 
 ## Watch out
@@ -262,5 +275,6 @@ Runs programs and reads files:
 - A local Claude Code session renamed with `/rename Fix login` is called `Fix login` in the tab bar and on its Agents card; reopening it from History while it runs brings it to the front.
 - `«` in the Agents footer narrows the sidebar to the rail: spaces are colored letter avatars, agents their program icons, the focused agent's row highlighted; `»` brings it back.
 - `Copy link` on a Claude Code card (Overview, or resting on an Agents card) puts `herdr-resume://<machine|local>/<id>` on the clipboard; with the handler installed, `open '<that link>'` in a shell brings that session to the front.
-- `node --test history.test.mjs` passes in `mods/agent-deck-history`, `node --test resume.test.mjs` in `mods/agent-deck-overview`, and `python3 -m unittest test_agent_deck_resume` in `resume-link/`.
+- With no `data/harness-overview/config.json`, `⌘⇧H` shows `No board script configured`; pointed at `example/board.py` it shows the made-up board, and `Save draft`, ✕, `Send` and `OK` change it.
+- `node --test history.test.mjs` passes in `mods/agent-deck-history`, `node --test board.test.mjs` and `python3 -m unittest test_board.py` (in `example/`) in `mods/harness-overview`, `node --test resume.test.mjs` in `mods/agent-deck-overview`, and `python3 -m unittest test_agent_deck_resume` in `resume-link/`.
 - `herdr-app check` passes for all six mods.
