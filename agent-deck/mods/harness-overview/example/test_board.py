@@ -35,6 +35,9 @@ class ExampleBoard(unittest.TestCase):
         for i in (i for s in d["sections"] for i in s["items"]):
             for k in ("qkey", "column", "text", "tasks", "sessions", "links", "draft", "question"):
                 self.assertIn(k, i)
+        for b in d["blocked"]:  # why each session is blocked
+            for k in ("address", "task", "title", "kind", "question", "since", "harness", "cards"):
+                self.assertIn(k, b)
         for t in d["tasks"]:
             for k in ("task", "column", "state", "sessions"):
                 self.assertIn(k, t)

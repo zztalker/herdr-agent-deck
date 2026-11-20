@@ -81,7 +81,11 @@ def board():
             {"task": "login", "n": 2, "title": "New login page", "goal": "", "state": "active", "column": "Active",
              "target": "", "sessions": [{"address": "t5", "status": "working"}], "last": "review asked"},
         ],
-        "blocked": [{"address": "t3", "task": "release"}],
+        "blocked": [{"address": "t3", "task": "release", "title": "deploy 2.4", "kind": "question",
+                     "question": "Deploy 2.4.0 to production now? (Deploy · Wait for the morning)",
+                     "since": (now() - timedelta(minutes=5)).isoformat(timespec="seconds"),
+                     "harness": {"state": "waiting-approval", "next": "deploy, then watch errors for 30 min"},
+                     "cards": ["Urgent|U1"]}],
     }
 
 

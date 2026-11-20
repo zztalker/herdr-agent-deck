@@ -52,7 +52,8 @@ export function columns(data, keep = () => true) {
 // Every typed word appears somewhere in the card.
 export function matches(words, x) {
   if (!words.length) return true;
-  const text = [x.id, x.group, x.text, x.task, x.title, x.state, x.last, x.goal, x.sent,
+  const text = [x.id, x.group, x.text, x.task, x.title, x.state, x.last, x.goal, x.sent, x.address, x.question,
+    ...Object.values(x.harness ?? {}),
     ...(x.tasks ?? []), ...(x.sessions ?? []).map((s) => s.address),
     ...(x.entries ?? []).flatMap((e) => [e.name, e.quote, ...(e.questions ?? []), ...(e.answers ?? []).map((a) => a.body)])]
     .filter(Boolean).join(" ").toLowerCase();

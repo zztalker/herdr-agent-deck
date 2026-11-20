@@ -475,7 +475,7 @@ export default class HarnessOverview extends View {
     if (this.config === null) return root.child(this.setup(t));
     if (!d) return root.child(div().p(24).text_color(t.dim).child(this.loading || this.config === undefined ? "Reading the harness…" : "No data"));
 
-    const blockedRow = blockedHere.length === 0 ? [] : [v_flex().id("blocked").flex_none().gap(4).px(8).py(6).rounded(8).border(1).border_color(t.blocked).bg(t.blocked + "14")
+    const blockedRow = blockedHere.length === 0 ? [] : [v_flex().id("blocked").flex_none().gap(8).px(8).py(6).rounded(8).border(1).border_color(t.blocked).bg(t.blocked + "14")
       .child(div().text_size(11).font_semibold().text_color(t.blocked).child(`Blocked sessions ${blockedHere.length}`))
       .children(blockedHere.map((b) => {
         const key = sessionKey(b);
@@ -488,6 +488,21 @@ export default class HarnessOverview extends View {
             .child(div().flex_1())
             .when(!open && notes.length === 0, (el) => el.child(this.btn(t, `bl-ask-${b.address}`, "Ask", (cx) => this.openEditor(key, b.address, cx),
               { disabled: Boolean(this.busy), tip: "Ask the manager about this session" }))))
+          // Why it is blocked: its tab, what the dialog asks, its own harness notes.
+          .when(Boolean(b.title), (el) => el.child(div().text_size(11.5).font_semibold().text_color(t.foreground).truncate().child(b.title)))
+          .when(Boolean(b.kind || b.since || b.harness?.state), (el) => el.child(h_flex().flex_wrap().gap(4)
+            .when(Boolean(b.kind), (el) => el.child(this.chip(t, `bl-k-${b.address}`, b.kind, t.blocked)))
+            .when(Boolean(b.since), (el) => el.child(this.chip(t, `bl-a-${b.address}`, `asked ${ago(b.since)}`, t.dim, b.since)))
+            .when(Boolean(b.harness?.state), (el) => el.child(this.chip(t, `bl-h-${b.address}`, `h.state ${b.harness.state}`, t.working)))))
+          .when(Boolean(b.question), (el) => el.child(this.body(t, `bl-q-${b.address}`, b.question, known, 11.5)))
+          .when(Boolean(b.harness?.ask), (el) => el.child(this.body(t, `bl-ask-txt-${b.address}`, `ask: ${b.harness.ask}`, known, 11)))
+          .when(Boolean(b.harness?.next), (el) => el.child(div().text_color(t.dim).child(this.body(t, `bl-n-${b.address}`, `next: ${b.harness.next}`, known, 11))))
+          .when((b.cards ?? []).length > 0, (el) => el.child(h_flex().flex_wrap().gap(4).items_center()
+            .child(div().text_size(10.5).text_color(t.dim).child("on the board:"))
+            .children([...b.cards.reduce((m, q) => m.set(q.split("|")[0], (m.get(q.split("|")[0]) ?? 0) + 1), new Map())].map(([col, n], k) => div().id(`bl-c-${b.address}-${k}`).px(5).py(1).rounded(4).border(1).border_color(t.border).text_size(10.5)
+              .text_color(t.accent).cursor_pointer().hover((s) => s.bg(t.hover)).tooltip("Show the cards that name this session")
+              .on_click((_e, cx) => { cx.stop_propagation(); this.query = b.address; this.input.set_value(b.address); cx.notify(); })
+              .child(n > 1 ? `${col} ×${n}` : col)))))
           .when(open || notes.length > 0, (el) => el.child(this.askRow(t, `bl-${b.address}`, key, "Ask", b.address)));
       }))];
     const fyiToggle = this.btn(t, "fyi", this.showFyi ? `Hide FYI (${c.fyi.length})` : `FYI (${c.fyi.length})`, (cx) => { this.showFyi = !this.showFyi; cx.notify(); });

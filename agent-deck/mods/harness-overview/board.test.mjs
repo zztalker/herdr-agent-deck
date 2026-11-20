@@ -230,3 +230,12 @@ test("notesFor: the drafts saved under one key", () => {
   assert.deepEqual(notesFor(draft, "task|infra").map((n) => n.nid), ["1", "3"]);
   assert.deepEqual(notesFor(undefined, "x"), []);
 });
+
+test("matches: a blocked session is found by its tab title, its question and its harness state", () => {
+  const b = { address: "vm/t2", task: "sec", title: "scanner update", question: "Proceed on Jenkins evidence?", harness: { state: "waiting-ci", next: "watcher polling" } };
+  assert.equal(matches(["jenkins"], b), true);
+  assert.equal(matches(["scanner"], b), true);
+  assert.equal(matches(["waiting-ci"], b), true);
+  assert.equal(matches(["polling"], b), true);
+  assert.equal(matches(["nothing"], b), false);
+});

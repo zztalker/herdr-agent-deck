@@ -70,7 +70,7 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 
 **batch** (Questions; `answered` first with an **OK** button, then `waiting` and `ok-sent`; `accepted` left out): `sent` (its id), `status`, `entries`: `[{ "key", "name", "where", "quote", "questions": [text], "answers": [{ "head", "body" }], "draft": [note] }]`. Each entry shows its `name` as its title (a URL reads as `app!183` and opens on click), an `asked from <where>` chip, its `quote` (the item as it read when asked; sessions any card names are links there), then the questions and answers. An entry with answers has **Ask more**, which uses its `key` as `KEY`.
 
-**blocked**: sessions waiting on a dialog, shown on top of In progress.
+**blocked**: sessions waiting on a dialog, shown on top of In progress: `{ "address", "task", "title" (its tab), "kind" (`question`, …), "question" (what the dialog asks, markdown), "since" (ISO time asked), "harness": { "state", "next", "ask", "result" } (any notes the session keeps), "cards": [qkey] (queue cards naming it) }`; only `address` is required. The card shows the title, `kind · asked 18h ago · h.state …` chips, the question, `ask:` and `next:` notes, and `on the board: Urgent · Decide ×3` chips that filter the board to that session.
 
 The filter box matches every word against ids, groups, text, tasks, sessions and answers. The **Task** drop-list (All, each task with its number of cards, No task) shows one task's cards: queue cards and batches by their `tasks`, task cards and blocked sessions by their `task`. The pick is remembered.
 

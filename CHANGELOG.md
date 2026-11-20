@@ -5,6 +5,7 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 ## 2026-11-21
 
 ### Changed
+- **Harness board, blocked sessions say why:** each one shows its tab title, what its dialog asks, how long ago, its harness notes (`h.state`, `ask`, `next`) and which board cards name it (click to filter to them). New optional `blocked` fields: `title`, `kind`, `question`, `since`, `harness`, `cards`; the example script fills them. The filter box matches them too.
 - **Harness board, Ask:** task cards, blocked sessions and questions still waiting for an answer have an **Ask** button: the same box as Answer (Send now, or Save draft). It passes `task|<task>` or `session|<address>` as KEY (a question entry its own key), so the script can send your text with that task's or session's context; the example script handles both. Tests: `taskKey`, `sessionKey`, `notesFor` in `board.test.mjs`; `example/test_board.py`.
 - **Harness board, Questions:** each question shows the item it was asked about (the quoted line, with its links and sessions clickable) and an `asked from <column>` chip. A title that is a URL reads as people name it (`app!183`, `tool#12`, `app job 4506831`, `ABC-123`) and opens on click, here and in the Drafts dialog; bare URLs in card text get the same short names. Tests: `shortTitle`, `knownSessions` in `board.test.mjs`.
 
