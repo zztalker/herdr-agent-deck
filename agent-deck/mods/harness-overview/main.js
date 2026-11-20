@@ -14,7 +14,7 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, Popup } from "gpui-base";
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
-import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions } from "./board.js";
+import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor } from "./board.js";
 
 const SHORT = 260; // characters of a card's text before "more"
 const QS_WORD = { waiting: "question sent", answered: "answered", "ok-sent": "OK sent", accepted: "accepted" };
@@ -218,7 +218,7 @@ export default class HarnessOverview extends View {
           const text = this.answer.value();
           if (!text.trim() && !hasDrafts) return;
           this.act(key, ["answer", key, ...(text.trim() ? [text] : [])], cx, (r) => `Sent to the manager${r.pinged ? "" : " (not pinged: it is busy with a dialog)"}`);
-        }, { primary: true, disabled: Boolean(this.busy), tip: "Append to QUESTIONS.md now (with this card's drafts) and ping the manager" }))
+        }, { primary: true, disabled: Boolean(this.busy), tip: "Send now, with this card's saved drafts" }))
         .child(this.btn(t, `ed-save-${key}`, "Save draft", (cx) => {
           const text = this.answer.value();
           if (text.trim()) this.act(key, ["draft", "add", key, text], cx, () => "Draft saved");
@@ -257,6 +257,16 @@ export default class HarnessOverview extends View {
         : h_flex().gap(6).child(this.btn(t, `${id}-ans`, i.draft.length ? "Answer / send drafts" : "Answer", (cx) => this.openEditor(i.qkey, head, cx), { disabled: Boolean(this.busy) })));
   }
 
+  // Saved drafts under `key`, then the answer box or the button that opens it (Ask / Answer…).
+  askRow(t, id, key, label, title) {
+    const notes = notesFor(this.view?.draft, key);
+    return v_flex().id(`${id}-ask`).gap(5)
+      .when(notes.length > 0, (el) => el.child(this.drafts(t, id, notes)))
+      .child(this.edit?.key === key ? this.editor(t, key, notes.length > 0)
+        : h_flex().gap(6).child(this.btn(t, `${id}-askbtn`, notes.length ? `${label} / send drafts` : label, (cx) => this.openEditor(key, title, cx),
+          { disabled: Boolean(this.busy), tip: "Ask the manager about this; your text goes with its context" })));
+  }
+
   taskCard(t, x) {
     const id = `tk-${x.task}`;
     const waiting = x.column === "Waiting on you";
@@ -267,7 +277,8 @@ export default class HarnessOverview extends View {
         .when(waiting, (el) => el.child(this.chip(t, `${id}-w`, "waiting on you", t.blocked))))
       .child(this.body(t, `${id}-state`, x.state, x.sessions, 11.5))
       .when(Boolean(x.last), (el) => el.child(this.body(t, `${id}-last`, `last: ${x.last}`, x.sessions)))
-      .when(x.sessions.length > 0, (el) => el.child(h_flex().flex_wrap().gap(4).children(x.sessions.map((s) => this.sessionChip(t, `${id}-s-${s.address}`, s)))));
+      .when(x.sessions.length > 0, (el) => el.child(h_flex().flex_wrap().gap(4).children(x.sessions.map((s) => this.sessionChip(t, `${id}-s-${s.address}`, s)))))
+      .child(this.askRow(t, id, taskKey(x), "Ask", x.task));
   }
 
   // A card's title: a link reads as people name it (app!183) and opens on click; the full name on hover.
@@ -305,8 +316,8 @@ export default class HarnessOverview extends View {
             .child(div().text_size(10.5).text_color(t.done).child(plain(a.head)))
             .child(this.body(t, `${eid}-a${n}`, a.body))))
           .when(e.draft.length > 0, (el) => el.child(this.drafts(t, eid, e.draft)))
-          .when(e.answers.length > 0 || editing, (el) => el.child(editing ? this.editor(t, e.key, e.draft.length > 0)
-            : h_flex().child(this.btn(t, `${eid}-more`, "Ask more", (cx) => this.openEditor(e.key, e.name, cx), { disabled: Boolean(this.busy) }))));
+          .child(editing ? this.editor(t, e.key, e.draft.length > 0)
+            : h_flex().child(this.btn(t, `${eid}-more`, e.answers.length > 0 ? "Ask more" : "Ask", (cx) => this.openEditor(e.key, e.name, cx), { disabled: Boolean(this.busy) })));
       }));
   }
 
@@ -425,6 +436,7 @@ export default class HarnessOverview extends View {
     const words = this.query.toLowerCase().split(/\s+/).filter(Boolean);
     const keep = (x) => keepTask(this.taskFilter, x) && matches(words, x);
     const c = columns(d ?? {}, keep);
+    this.view = d;
     const known = knownSessions(d);
     const blockedHere = c.blocked.filter((b) => keepTask(this.taskFilter, b) && matches(words, { ...b, tasks: [b.task], sessions: [b] }));
     const draftN = d?.draft?.length ?? 0;
@@ -465,9 +477,19 @@ export default class HarnessOverview extends View {
 
     const blockedRow = blockedHere.length === 0 ? [] : [v_flex().id("blocked").flex_none().gap(4).px(8).py(6).rounded(8).border(1).border_color(t.blocked).bg(t.blocked + "14")
       .child(div().text_size(11).font_semibold().text_color(t.blocked).child(`Blocked sessions ${blockedHere.length}`))
-      .child(h_flex().flex_wrap().gap(4).children(blockedHere.map((b) => h_flex().id(`bl-${b.address}`).gap(4)
-        .child(this.sessionChip(t, `bl-s-${b.address}`, { address: b.address, status: "blocked" }))
-        .when(Boolean(b.task), (el) => el.child(this.chip(t, `bl-t-${b.address}`, b.task, t.accent))))))];
+      .children(blockedHere.map((b) => {
+        const key = sessionKey(b);
+        const open = this.edit?.key === key;
+        const notes = notesFor(d.draft, key);
+        return v_flex().id(`bl-${b.address}`).gap(4)
+          .child(h_flex().gap(4).items_center()
+            .child(this.sessionChip(t, `bl-s-${b.address}`, { address: b.address, status: "blocked" }))
+            .when(Boolean(b.task), (el) => el.child(this.chip(t, `bl-t-${b.address}`, b.task, t.accent)))
+            .child(div().flex_1())
+            .when(!open && notes.length === 0, (el) => el.child(this.btn(t, `bl-ask-${b.address}`, "Ask", (cx) => this.openEditor(key, b.address, cx),
+              { disabled: Boolean(this.busy), tip: "Ask the manager about this session" }))))
+          .when(open || notes.length > 0, (el) => el.child(this.askRow(t, `bl-${b.address}`, key, "Ask", b.address)));
+      }))];
     const fyiToggle = this.btn(t, "fyi", this.showFyi ? `Hide FYI (${c.fyi.length})` : `FYI (${c.fyi.length})`, (cx) => { this.showFyi = !this.showFyi; cx.notify(); });
 
     return root.child(h_flex().id("body").flex_1().min_h(0).p(12).gap(10).items_stretch()

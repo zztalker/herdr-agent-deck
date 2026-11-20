@@ -82,13 +82,15 @@ The filter box matches every word against ids, groups, text, tasks, sessions and
 
 | Button | Runs | Should |
 | --- | --- | --- |
-| Save draft | `draft add KEY TEXT` | keep a note for that card |
+| Save draft | `draft add KEY TEXT` | keep a note for that card (or task / session, below) |
 | ✎ then Save (Drafts dialog) | `draft edit NID TEXT` | change its text |
 | ✕ on a draft | `draft del NID` | delete it |
-| Send (in the answer box) | `answer KEY [TEXT]` | send that card's drafts plus TEXT now; leave other drafts alone |
+| Send (in the answer / ask box) | `answer KEY [TEXT]` | send that card's drafts plus TEXT now; leave other drafts alone |
 | Send this card (Drafts dialog) | `answer KEY` | send that card's drafts |
 | Send all (Drafts dialog) | `send` | send every draft |
 | OK | `ok SENT` | accept that batch's answer |
+
+**KEY** is a card's `qkey`, an answer entry's `key`, `task|<task>` (the **Ask** button on a task card; a task's own `key` if it has one) or `session|<address>` (**Ask** on a blocked session). For the last two the script should send your text with what it knows about that task or session, so the reader has the context.
 
 Commands for keys: `harness-overview.drafts` toggles the Drafts dialog, `harness-overview.refresh` rereads, `harness-overview.task <name>` / `harness-overview.task` pick a task / all.
 

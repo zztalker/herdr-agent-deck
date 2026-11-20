@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -215,4 +215,18 @@ test("knownSessions: every session the board names, once (cards, tasks, blocked,
   };
   assert.deepEqual(knownSessions(d).map((s) => s.address), ["vm/t2", "vm/t3", "box/t9", "box/t1"]);
   assert.deepEqual(knownSessions({}), []);
+});
+
+// --- Ask on tasks and blocked sessions -------------------------------------------------------
+
+test("Ask keys: task|<name> and session|<address>; a task's own key wins", () => {
+  assert.equal(taskKey({ task: "infra" }), "task|infra");
+  assert.equal(taskKey({ task: "infra", key: "custom-key" }), "custom-key");
+  assert.equal(sessionKey({ address: "vm/t4", task: "a" }), "session|vm/t4");
+});
+
+test("notesFor: the drafts saved under one key", () => {
+  const draft = [{ nid: "1", qkey: "task|infra" }, { nid: "2", qkey: "Decide|D1" }, { nid: "3", qkey: "task|infra" }];
+  assert.deepEqual(notesFor(draft, "task|infra").map((n) => n.nid), ["1", "3"]);
+  assert.deepEqual(notesFor(undefined, "x"), []);
 });

@@ -83,6 +83,20 @@ class ExampleBoard(unittest.TestCase):
         _, d = self.run_board("json")
         self.assertEqual(next(b for b in d["batches"] if b["sent"] == answered[0]["sent"])["status"], "ok-sent")
 
+    def test_ask_about_a_task_or_a_blocked_session(self):
+        rc, res = self.run_board("answer", "task|release", "when does it ship?")
+        self.assertEqual((rc, res["ok"], res["sent"]), (0, True, 1))
+        rc, res = self.run_board("draft", "add", "session|t3", "what is it waiting for?")
+        self.assertEqual((rc, res["ok"]), (0, True))
+        _, d = self.run_board("json")
+        e = d["batches"][-1]["entries"][0]
+        self.assertEqual((e["name"], e["where"]), ("release", "Task"))
+        self.assertEqual(e["questions"], ["when does it ship?"])
+        self.assertEqual([(n["name"], n["where"]) for n in d["draft"]], [("t3", "Blocked session")])
+        for key in ("task|nope", "session|t99"):
+            rc, res = self.run_board("draft", "add", key, "x")
+            self.assertEqual((rc, res["ok"]), (1, False), key)
+
     def test_errors_are_json_with_exit_1(self):
         for args in (["draft", "add", "nope", "x"], ["answer", "Decide|D1"], ["ok", "nope"], ["frobnicate"]):
             rc, res = self.run_board(*args)

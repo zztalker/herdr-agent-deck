@@ -7,7 +7,8 @@ Every command prints one JSON object and exits 1 when its "ok" is false. The for
 (default ~/.cache/harness-overview-example.json), so the page's buttons work for real here.
 
   board.py json                  the board
-  board.py draft add KEY TEXT    save a draft note on a card (KEY: the card's qkey or an answer's key)
+  board.py draft add KEY TEXT    save a draft note (KEY: a card's qkey, an answer's key,
+                                 task|<name> or session|<address>)
   board.py draft edit NID TEXT  change a draft note
   board.py draft del NID         delete a draft note
   board.py answer KEY [TEXT]     send that card's drafts (+ TEXT) now
@@ -101,7 +102,16 @@ def find_answer(state, key):
 def add(state, b, key, text):
     if not text.strip():
         return "empty text"
-    if key.startswith("followup|"):
+    kind, _, rest = key.partition("|")
+    if kind == "task":
+        if not any(t["task"] == rest for t in b["tasks"]):
+            return "unknown task " + rest
+        name, where = rest, "Task"
+    elif kind == "session":
+        if not any(x["address"] == rest for x in b["blocked"]):
+            return "unknown blocked session " + rest
+        name, where = rest, "Blocked session"
+    elif kind == "followup":
         e = find_answer(state, key)
         if not e:
             return "unknown answer " + key
