@@ -80,7 +80,7 @@ The filter box matches every word against ids, groups, text, tasks, sessions and
 
 ### Reader
 
-"more" opens the whole text in a large window. A text with no line breaks gets **guess formatting** first (`format.js`): fixed rules, so the same text always comes out the same, and a text that already has line breaks is left as written. In order:
+"more" opens the whole text in a large window; **Copy** at its top right puts that text (markdown) on the clipboard. A text with no line breaks gets **guess formatting** first (`format.js`): fixed rules, so the same text always comes out the same, and a text that already has line breaks is left as written. In order:
 
 1. a leading `2026-01-21 00:28` time is made bold;
 2. a text opening with a bold header (`**[brief](…)** · **from `vm/t5`** (tab "…"):`) has that header, up to its first `: ` outside quotes and brackets, on its own line;

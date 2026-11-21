@@ -213,6 +213,13 @@ export default class HarnessOverview extends View {
       .on_click((_e, cx) => cx.stop_propagation())
       .child(h_flex().h(44).flex_none().px(16).gap(10).items_center().border_b(1).border_color(t.border)
         .child(div().flex_1().min_w(0).truncate().text_size(14).font_semibold().text_color(t.foreground).child(r.title || "Text"))
+        // Copy: the text as shown here (markdown, links and all) to the clipboard.
+        .child(this.btn(t, "rd-copy", r.copied ? "Copied" : "Copy", (cx) => {
+          cx.write_to_clipboard(r.md);
+          r.copied = true;
+          cx.notify();
+          cx.timer.after(2000, (cx) => { if (this.reader === r) { r.copied = false; cx.notify(); } });
+        }, { tip: "Copy this text (markdown) to the clipboard" }))
         .child(div().id("rd-close").p(4).rounded(4).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
           .tooltip("Close (Esc)").on_click((_e, cx) => close(cx)).child(svg("mods/workspace-chrome/x.svg").size(14))))
       .child(v_flex().id("rd-body").flex_1().min_h(0).px(24).py(16).overflow_y_scrollbar().text_size(14).text_color(t.foreground)
