@@ -58,7 +58,7 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 | --- | --- |
 | `qkey` | Unique key; the buttons pass it back as `KEY`. |
 | `id`, `group` | Title line: the id in bold, the group dimmed (the group alone when there's no id). |
-| `text` | Markdown, shown as such. Links, bare URLs (named as people name them: `app!183`, `tool#12`, `app job 4506831`, `ABC-123`, else host/…/last part) and the card's session addresses are clickable (a session goes to it; so does `tN` or `other-name/tN` when exactly one listed session ends in `/tN`). Cut at about 140 visible characters so cards stay small; "more" opens the whole text, formatted, in a reader window. |
+| `text` | Markdown, shown as such. Links, bare URLs (named as people name them: `app!183`, `tool#12`, `app job 4506831`, `ABC-123`, else host/…/last part) and the card's session addresses are clickable (a session goes to it; so does `tN` or `other-name/tN` when exactly one listed session ends in `/tN`). Cut at about 140 visible characters so cards stay small; "more" opens the whole text, formatted, in a reader window (see **Reader** below). |
 | `age`, `due`, `rec` | Optional: "16h" at the right, a `due 2026-01-07` chip, a `★ recommendation` line. |
 | `tasks` | Task names, as chips. |
 | `sessions` | `[{ "address": "vm/t2", "status": "blocked" }]`: chips colored by status; a running one (status set) is a button that goes to that session. |
@@ -68,7 +68,7 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 
 **task** (In progress; `Waiting on you` first, `Closed` left out): `task`, `title`, `state`, `column` (`Active`, `Waiting on you`, `Closed`), `sessions` (as on cards), `last` (latest log line).
 
-**batch** (Questions; `answered` first with an **OK** button, then `waiting` and `ok-sent`; `accepted` left out): `sent` (its id), `status`, `entries`: `[{ "key", "name", "where", "quote", "questions": [text], "answers": [{ "head", "body" }], "draft": [note] }]`. Each entry shows its `name` as its title (a URL reads as `app!183` and opens on click), an `asked from <where>` chip, its `quote` (the item as it read when asked; sessions any card names are links there), then the questions and answers. An entry with answers has **Ask more**, which uses its `key` as `KEY`.
+**batch** (Questions; `answered` first with an **OK** button, then `waiting` and `ok-sent`; `accepted` left out): `sent` (its id), `status`, `entries`: `[{ "key", "name", "where", "quote", "questions": [text], "answers": [{ "head", "body" }], "draft": [note] }]`. Each entry shows its `name` as its title (a URL reads as `app!183` and opens on click), an `asked from <where>` chip, its `quote` (the item as it read when asked; sessions any card names are links there), then the questions and answers. An entry with answers has **Ask more**, which uses its `key` as `KEY`. **Thread** (and "more" on its quote, questions or answers) opens the whole thread in the reader: every entry with the same `name` across the batches, oldest first, under what it was asked from and about.
 
 **blocked**: sessions waiting on a dialog, shown on top of In progress: `{ "address", "task", "title" (its tab), "kind" (`question`, …), "question" (what the dialog asks, markdown), "since" (ISO time asked), "harness": { "state", "next", "ask", "result" } (any notes the session keeps), "cards": [qkey] (queue cards naming it) }`; only `address` is required. The card shows the title, `kind · asked 18h ago · h.state …` chips, the question, `ask:` and `next:` notes, and `on the board: Urgent · Decide ×3` chips that filter the board to that session.
 
@@ -77,6 +77,20 @@ The filter box matches every word against ids, groups, text, tasks, sessions and
 **note** (a draft; in `draft` and on cards): `{ "nid", "qkey", "text", "at" }`, plus for the Drafts dialog's titles `id` or `name` (else `key`), `column` or `where`, `group` and `excerpt` (all optional).
 
 **Drafts dialog** (the `Drafts (N)` button): every draft by card, with ✎ (edit), ✕, `Send this card` per card and `Send all`.
+
+### Reader
+
+"more" opens the whole text in a large window. A text with no line breaks gets **guess formatting** first (`format.js`): fixed rules, so the same text always comes out the same, and a text that already has line breaks is left as written. In order:
+
+1. a leading `2026-01-21 00:28` time is made bold;
+2. a text opening with a bold header (`**[brief](…)** · **from `vm/t5`** (tab "…"):`) has that header, up to its first `: ` outside quotes and brackets, on its own line;
+3. ` — **2026-…` (a dated update) starts a paragraph;
+4. options at the end, `(A (Recommended) · B)`, become a bullet list;
+5. inline steps `1) … → 2) … → 3) …` become a numbered list;
+6. a label after a sentence (`Was: …`, `Report: …`, `**P1 order:** …`) starts a paragraph;
+7. a paragraph still over 400 characters is split at sentence ends into paragraphs of about 300 (not after `e.g.`, `i.e.`, `etc.`).
+
+Links, autolinks and code spans are never split or changed.
 
 ### The button commands
 
@@ -98,7 +112,7 @@ Each prints `{ "ok": true, … }` or `{ "ok": false, "error": "…" }`. After **
 
 ## Files
 
-- `main.js`: the page. `board.js`: config, columns and text, tested in `board.test.mjs` (`node --test board.test.mjs`).
+- `main.js`: the page. `board.js`: config, columns, links, titles, tasks, drafts and threads, tested in `board.test.mjs` (`node --test board.test.mjs`). `format.js`: the reader's guess formatting, tested in `format.test.mjs`.
 - `example/board.py`: the example script (stdlib Python), tested in `example/test_board.py` (`python3 -m unittest test_board.py` from `example/`).
 - `kanban.svg`: Lucide `square-kanban` (ISC).
 

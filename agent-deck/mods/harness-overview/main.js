@@ -14,7 +14,8 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, Popup } from "gpui-base";
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
-import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor } from "./board.js";
+import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown } from "./board.js";
+import { formatText } from "./format.js";
 
 const SHORT = 140; // visible characters of a card's text before "more" (which opens the reader)
 const QS_WORD = { waiting: "question sent", answered: "answered", "ok-sent": "OK sent", accepted: "accepted" };
@@ -186,7 +187,8 @@ export default class HarnessOverview extends View {
 
   // Markdown with clickable links (URLs, and the card's sessions). Long text is cut short so cards
   // stay small; "more" opens it whole in the reader window.
-  body(t, id, md, sessions = [], size = 12, title = "") {
+  // `whole`: markdown the reader shows instead of this text (a question's whole thread).
+  body(t, id, md, sessions = [], size = 12, title = "", whole = null) {
     const full = linkify(md ?? "", sessions);
     const { text, cut } = cutMarkdown(full, SHORT);
     return v_flex().id(`${id}-body`).w_full().min_w(0).text_size(size).text_color(t.foreground)
@@ -194,7 +196,7 @@ export default class HarnessOverview extends View {
         .on_link_click((url, _cx) => this.openLink(url)))
       .when(cut, (el) => el.child(div().id(`${id}-more`).text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.text_color(t.foreground))
         .tooltip("Read it all")
-        .on_click((_e, cx) => { cx.stop_propagation(); this.reader = { title: shortTitle(title), md: full }; cx.notify(); })
+        .on_click((_e, cx) => { cx.stop_propagation(); this.reader = { title: shortTitle(title), md: whole ?? formatText(full) }; cx.notify(); })
         .child("more")));
   }
 
@@ -318,20 +320,25 @@ export default class HarnessOverview extends View {
       .children(b.entries.map((e, k) => {
         const eid = `${id}-e${k}`;
         const editing = this.edit?.key === e.key;
+        const thread = threadMarkdown(e.name, threadOf(this.view?.batches, e.name), (x) => formatText(linkify(x, known)));
+        const openThread = (cx) => { this.reader = { title: `${shortTitle(e.name)} · thread`, md: thread }; cx.notify(); };
         return v_flex().id(eid).gap(4).pt(4).border_t(1).border_color(t.border)
           .child(h_flex().gap(6).items_center().min_w(0)
             .child(this.title(t, `${eid}-title`, e.name, 320))
             .when(Boolean(e.where), (el) => el.child(this.chip(t, `${eid}-where`, `asked from ${e.where}`, t.dim)))
-            .child(div().flex_1()))
+            .child(div().flex_1())
+            .child(div().id(`${eid}-thread`).flex_none().text_size(11).text_color(t.accent).cursor_pointer().hover((s) => s.underline())
+              .tooltip("Read the whole thread: what it's about, every question and answer").on_click((_e, cx) => { cx.stop_propagation(); openThread(cx); })
+              .child("Thread")))
           // The item as it read when asked: what the question is about.
           .when(Boolean(e.quote), (el) => el.child(div().id(`${eid}-quote`).pl(8).border_l(2).border_color(t.border).text_color(t.dim)
-            .child(this.body(t, `${eid}-quote`, e.quote, known, 11, e.name))))
+            .child(this.body(t, `${eid}-quote`, e.quote, known, 11, e.name, thread))))
           .children(e.questions.map((q, n) => h_flex().id(`${eid}-q${n}`).gap(4).items_start().min_w(0)
             .child(div().flex_none().text_size(11.5).child("❓"))
-            .child(this.body(t, `${eid}-q${n}`, q, known, 11.5, e.name))))
+            .child(this.body(t, `${eid}-q${n}`, q, known, 11.5, e.name, thread))))
           .children(e.answers.map((a, n) => v_flex().id(`${eid}-a${n}`).px(6).py(4).rounded(4).bg(t.chrome).gap(2)
             .child(div().text_size(10.5).text_color(t.done).child(plain(a.head)))
-            .child(this.body(t, `${eid}-a${n}`, a.body, known, 12, e.name))))
+            .child(this.body(t, `${eid}-a${n}`, a.body, known, 12, e.name, thread))))
           .when(e.draft.length > 0, (el) => el.child(this.drafts(t, eid, e.draft)))
           .child(editing ? this.editor(t, e.key, e.draft.length > 0)
             : h_flex().child(this.btn(t, `${eid}-more`, e.answers.length > 0 ? "Ask more" : "Ask", (cx) => this.openEditor(e.key, e.name, cx), { disabled: Boolean(this.busy) })));

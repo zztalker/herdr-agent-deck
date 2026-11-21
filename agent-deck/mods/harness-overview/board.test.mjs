@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -238,4 +238,54 @@ test("matches: a blocked session is found by its tab title, its question and its
   assert.equal(matches(["waiting-ci"], b), true);
   assert.equal(matches(["polling"], b), true);
   assert.equal(matches(["nothing"], b), false);
+});
+
+// --- the whole thread of a question, for the reader ------------------------------------------------
+
+const QB = [
+  { sent: "2026-01-05 09:00 UTC", status: "accepted", entries: [{ name: "R1", where: "On review", quote: "Review login", questions: ["[2026-01-05 09:00] reachable?"], answers: [{ head: "Answer [09:30]", body: "No." }] }] },
+  { sent: "2026-01-06 10:00 UTC", status: "answered", entries: [
+    { name: "R1", where: "On review", quote: "follow-up to batch 2026-01-05 09:00 UTC", questions: ["[2026-01-06 10:00] and the API?"], answers: [{ head: "Answer [10:30]", body: "Same." }] },
+    { name: "D2", where: "Decide", quote: "x", questions: ["q"], answers: [] }] },
+];
+
+test("threadOf: every entry about one name, oldest batch first, with its batch's time and status", () => {
+  assert.deepEqual(threadOf(QB, "R1").map((e) => [e.sent, e.status, e.questions[0]]), [
+    ["2026-01-05 09:00 UTC", "accepted", "[2026-01-05 09:00] reachable?"],
+    ["2026-01-06 10:00 UTC", "answered", "[2026-01-06 10:00] and the API?"],
+  ]);
+  assert.deepEqual(threadOf(QB, "nope"), []);
+  assert.deepEqual(threadOf(undefined, "R1"), []);
+});
+
+test("threadMarkdown: what it is about, then each batch's questions and answers in order", () => {
+  const md = threadMarkdown("R1", threadOf(QB, "R1"), (x) => x);
+  assert.equal(md, [
+    "**Asked from On review**",
+    "",
+    "> Review login",
+    "",
+    "### Batch 2026-01-05 09:00 UTC · accepted",
+    "",
+    "**❓ [2026-01-05 09:00]** reachable?",
+    "",
+    "**Answer [09:30]**",
+    "",
+    "No.",
+    "",
+    "### Batch 2026-01-06 10:00 UTC · answered",
+    "",
+    "**❓ [2026-01-06 10:00]** and the API?",
+    "",
+    "**Answer [10:30]**",
+    "",
+    "Same.",
+  ].join("\n"));
+});
+
+test("threadMarkdown: texts go through the formatter; a follow-up's own quote isn't repeated", () => {
+  const md = threadMarkdown("R1", threadOf(QB, "R1"), (x) => x.toUpperCase());
+  assert.match(md, /> REVIEW LOGIN/);
+  assert.match(md, /SAME\./);
+  assert.doesNotMatch(md, /follow-up to batch/i);
 });

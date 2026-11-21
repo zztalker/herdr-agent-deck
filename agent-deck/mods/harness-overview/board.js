@@ -199,3 +199,31 @@ export function knownSessions(data) {
 export const taskKey = (x) => x.key ?? `task|${x.task}`;
 export const sessionKey = (b) => `session|${b.address}`;
 export const notesFor = (draft, key) => (draft ?? []).filter((n) => n.qkey === key);
+
+// --- the whole thread of a question, for the reader ------------------------------------------------
+
+// Every entry about `name` across the batches, oldest batch first, each with its batch's sent / status.
+export function threadOf(batches, name) {
+  return (batches ?? []).flatMap((b) => b.entries.filter((e) => e.name === name).map((e) => ({ ...e, sent: b.sent, status: b.status })))
+    .sort((a, b) => a.sent.localeCompare(b.sent));
+}
+
+// The thread as markdown: where it was asked from and what about (the first real quote), then per
+// batch its questions and answers. `format` shapes each text (formatText in the page).
+export function threadMarkdown(name, entries, format = (x) => x) {
+  const out = [];
+  const where = entries.find((e) => e.where)?.where;
+  const quote = entries.map((e) => e.quote).find((q) => q && !/^follow-up to batch/i.test(q));
+  if (where) out.push(`**Asked from ${where}**`, "");
+  if (quote) out.push(format(quote).split("\n").map((l) => `> ${l}`).join("\n"), "");
+  for (const e of entries) {
+    out.push(`### Batch ${e.sent} · ${e.status}`, "");
+    for (const q of e.questions ?? []) {
+      const m = q.match(/^\[([^\]]+)\]\s*([\s\S]*)$/);
+      out.push(m ? `**❓ [${m[1]}]** ${format(m[2])}` : `**❓** ${format(q)}`, "");
+    }
+    for (const a of e.answers ?? []) out.push(`**${a.head}**`, "", format(a.body), "");
+  }
+  while (out[out.length - 1] === "") out.pop();
+  return out.join("\n");
+}
