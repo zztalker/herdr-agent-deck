@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -288,4 +288,17 @@ test("threadMarkdown: texts go through the formatter; a follow-up's own quote is
   assert.match(md, /> REVIEW LOGIN/);
   assert.match(md, /SAME\./);
   assert.doesNotMatch(md, /follow-up to batch/i);
+});
+
+// --- render cost --------------------------------------------------------------------------------
+
+test("memo: computes once per key, then returns the same result; forgets the oldest past its size", () => {
+  let calls = 0;
+  const f = memo((a, b) => { calls++; return `${a}+${b}`; }, 2);
+  assert.equal(f("x", "1"), "x+1");
+  assert.equal(f("x", "1"), "x+1");
+  assert.equal(calls, 1);
+  f("y", "1"); f("z", "1"); // x drops out (size 2)
+  f("x", "1");
+  assert.equal(calls, 4);
 });

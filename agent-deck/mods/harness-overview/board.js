@@ -227,3 +227,19 @@ export function threadMarkdown(name, entries, format = (x) => x) {
   while (out[out.length - 1] === "") out.pop();
   return out.join("\n");
 }
+
+// --- render cost --------------------------------------------------------------------------------
+
+// f with its results kept by its (string) arguments, the `size` newest. Render runs on every change
+// (each key typed in the filter), so a card's text is linked and cut once, not on every frame.
+export function memo(f, size = 2000) {
+  const cache = new Map();
+  return (...args) => {
+    const key = args.join("\u0000");
+    if (cache.has(key)) return cache.get(key);
+    const v = f(...args);
+    cache.set(key, v);
+    if (cache.size > size) cache.delete(cache.keys().next().value);
+    return v;
+  };
+}

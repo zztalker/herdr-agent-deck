@@ -14,10 +14,15 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, Popup } from "gpui-base";
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
-import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown } from "./board.js";
+import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo } from "./board.js";
 import { formatText } from "./format.js";
 
 const SHORT = 140; // visible characters of a card's text before "more" (which opens the reader)
+// A text's links and its short cut, kept by text and sessions: render runs on every change.
+const shortText = memo((md, addrs) => {
+  const full = linkify(md, addrs ? addrs.split("\n").map((address) => ({ address })) : []);
+  return { full, ...cutMarkdown(full, SHORT) };
+});
 const QS_WORD = { waiting: "question sent", answered: "answered", "ok-sent": "OK sent", accepted: "accepted" };
 const ago = (iso) => {
   const m = Math.floor((Date.now() - Date.parse(iso)) / 60000);
@@ -187,16 +192,16 @@ export default class HarnessOverview extends View {
 
   // Markdown with clickable links (URLs, and the card's sessions). Long text is cut short so cards
   // stay small; "more" opens it whole in the reader window.
-  // `whole`: markdown the reader shows instead of this text (a question's whole thread).
+  // `whole`: a function giving the markdown the reader shows instead (a question's whole thread);
+  // it runs only on click, so render never pays for it.
   body(t, id, md, sessions = [], size = 12, title = "", whole = null) {
-    const full = linkify(md ?? "", sessions);
-    const { text, cut } = cutMarkdown(full, SHORT);
+    const { full, text, cut } = shortText(md ?? "", sessions.map((s) => s.address).join("\n"));
     return v_flex().id(`${id}-body`).w_full().min_w(0).text_size(size).text_color(t.foreground)
       .child(TextView.markdown(`${id}-md`, text).selectable(true).w_full()
         .on_link_click((url, _cx) => this.openLink(url)))
       .when(cut, (el) => el.child(div().id(`${id}-more`).text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.text_color(t.foreground))
         .tooltip("Read it all")
-        .on_click((_e, cx) => { cx.stop_propagation(); this.reader = { title: shortTitle(title), md: whole ?? formatText(full) }; cx.notify(); })
+        .on_click((_e, cx) => { cx.stop_propagation(); this.reader = { title: shortTitle(title), md: whole ? whole() : formatText(full) }; cx.notify(); })
         .child("more")));
   }
 
@@ -320,8 +325,8 @@ export default class HarnessOverview extends View {
       .children(b.entries.map((e, k) => {
         const eid = `${id}-e${k}`;
         const editing = this.edit?.key === e.key;
-        const thread = threadMarkdown(e.name, threadOf(this.view?.batches, e.name), (x) => formatText(linkify(x, known)));
-        const openThread = (cx) => { this.reader = { title: `${shortTitle(e.name)} · thread`, md: thread }; cx.notify(); };
+        const thread = () => threadMarkdown(e.name, threadOf(this.view?.batches, e.name), (x) => formatText(linkify(x, known)));
+        const openThread = (cx) => { this.reader = { title: `${shortTitle(e.name)} · thread`, md: thread() }; cx.notify(); };
         return v_flex().id(eid).gap(4).pt(4).border_t(1).border_color(t.border)
           .child(h_flex().gap(6).items_center().min_w(0)
             .child(this.title(t, `${eid}-title`, e.name, 320))
