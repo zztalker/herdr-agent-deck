@@ -16,7 +16,7 @@ import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, P
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
 import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor } from "./board.js";
 
-const SHORT = 260; // characters of a card's text before "more"
+const SHORT = 140; // visible characters of a card's text before "more" (which opens the reader)
 const QS_WORD = { waiting: "question sent", answered: "answered", "ok-sent": "OK sent", accepted: "accepted" };
 const ago = (iso) => {
   const m = Math.floor((Date.now() - Date.parse(iso)) / 60000);
@@ -35,7 +35,7 @@ export default class HarnessOverview extends View {
     this.loading = false;
     this.busy = null; // the key of the action running
     this.edit = null; // {key, title}: the card whose answer box is open
-    this.expanded = new Set();
+    this.reader = null; // {title, md}: the text "more" opened
     this.showFyi = false;
     this.query = "";
     // null: every task; NO_TASK: cards with none; else that task. The last pick is remembered.
@@ -184,18 +184,35 @@ export default class HarnessOverview extends View {
       .child(short);
   }
 
-  // Markdown with clickable links (URLs, and the card's sessions); long text folds behind "more".
-  body(t, id, md, sessions = [], size = 12) {
-    const open = this.expanded.has(id);
+  // Markdown with clickable links (URLs, and the card's sessions). Long text is cut short so cards
+  // stay small; "more" opens it whole in the reader window.
+  body(t, id, md, sessions = [], size = 12, title = "") {
     const full = linkify(md ?? "", sessions);
-    const { text, cut } = open ? { text: full, cut: false } : cutMarkdown(full, SHORT);
-    const long = open || cut;
+    const { text, cut } = cutMarkdown(full, SHORT);
     return v_flex().id(`${id}-body`).w_full().min_w(0).text_size(size).text_color(t.foreground)
-      .child(TextView.markdown(`${id}-md${open ? "-all" : ""}`, text).selectable(true).w_full()
+      .child(TextView.markdown(`${id}-md`, text).selectable(true).w_full()
         .on_link_click((url, _cx) => this.openLink(url)))
-      .when(long, (el) => el.child(div().id(`${id}-more`).text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.text_color(t.foreground))
-        .on_click((_e, cx) => { cx.stop_propagation(); open ? this.expanded.delete(id) : this.expanded.add(id); cx.notify(); })
-        .child(open ? "less" : "more")));
+      .when(cut, (el) => el.child(div().id(`${id}-more`).text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.text_color(t.foreground))
+        .tooltip("Read it all")
+        .on_click((_e, cx) => { cx.stop_propagation(); this.reader = { title: shortTitle(title), md: full }; cx.notify(); })
+        .child("more")));
+  }
+
+  // The reader: one long text, formatted, in a big scrolling window. Esc / outside click / ✕ close it.
+  readerDialog(t) {
+    const r = this.reader;
+    const close = (cx) => { this.reader = null; cx.notify(); };
+    const panel = v_flex().id("reader").w(900).h(900).max_w_full().max_h_full().min_h(0).rounded(10).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg()
+      .on_click((_e, cx) => cx.stop_propagation())
+      .child(h_flex().h(44).flex_none().px(16).gap(10).items_center().border_b(1).border_color(t.border)
+        .child(div().flex_1().min_w(0).truncate().text_size(14).font_semibold().text_color(t.foreground).child(r.title || "Text"))
+        .child(div().id("rd-close").p(4).rounded(4).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+          .tooltip("Close (Esc)").on_click((_e, cx) => close(cx)).child(svg("mods/workspace-chrome/x.svg").size(14))))
+      .child(v_flex().id("rd-body").flex_1().min_h(0).px(24).py(16).overflow_y_scrollbar().text_size(14).text_color(t.foreground)
+        .child(TextView.markdown("rd-md", r.md).selectable(true).w_full().on_link_click((url, _cx) => this.openLink(url))));
+    return div().id("reader-backdrop").absolute().inset_0().flex().items_center().justify_center().p(32).bg("#00000099")
+      .on_click((_e, cx) => close(cx))
+      .child(panel);
   }
 
   // The notes saved for this card, each with ✕.
@@ -243,10 +260,10 @@ export default class HarnessOverview extends View {
         .when(Boolean(i.due), (el) => el.child(this.chip(t, `${id}-due`, `due ${i.due}`, t.working)))
         .when(Boolean(qs), (el) => el.child(this.chip(t, `${id}-qs`, QS_WORD[qs] ?? qs, qs === "answered" ? t.done : t.accent)))
         .when(Boolean(i.age), (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child(i.age))))
-      .child(this.body(t, id, i.text, i.sessions))
+      .child(this.body(t, id, i.text, i.sessions, 12, head))
       .when(Boolean(i.rec), (el) => el.child(h_flex().gap(4).items_start().text_color(t.done)
         .child(div().flex_none().text_size(11.5).child("★"))
-        .child(this.body(t, `${id}-rec`, i.rec, i.sessions, 11.5))))
+        .child(this.body(t, `${id}-rec`, i.rec, i.sessions, 11.5, `${head} · recommendation`))))
       // Links the text already shows (as a link) aren't repeated as chips.
       .when(i.tasks.length + i.sessions.length + extra.length > 0, (el) => el.child(h_flex().flex_wrap().gap(4)
         .children(i.tasks.map((x) => this.chip(t, `${id}-t-${x}`, x, t.accent)))
@@ -275,8 +292,8 @@ export default class HarnessOverview extends View {
         .child(div().flex_none().font_semibold().text_size(12).text_color(t.foreground).child(x.task))
         .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(x.title ?? ""))
         .when(waiting, (el) => el.child(this.chip(t, `${id}-w`, "waiting on you", t.blocked))))
-      .child(this.body(t, `${id}-state`, x.state, x.sessions, 11.5))
-      .when(Boolean(x.last), (el) => el.child(this.body(t, `${id}-last`, `last: ${x.last}`, x.sessions)))
+      .child(this.body(t, `${id}-state`, x.state, x.sessions, 11.5, x.task))
+      .when(Boolean(x.last), (el) => el.child(this.body(t, `${id}-last`, `last: ${x.last}`, x.sessions, 12, `${x.task} · last`)))
       .when(x.sessions.length > 0, (el) => el.child(h_flex().flex_wrap().gap(4).children(x.sessions.map((s) => this.sessionChip(t, `${id}-s-${s.address}`, s)))))
       .child(this.askRow(t, id, taskKey(x), "Ask", x.task));
   }
@@ -308,13 +325,13 @@ export default class HarnessOverview extends View {
             .child(div().flex_1()))
           // The item as it read when asked: what the question is about.
           .when(Boolean(e.quote), (el) => el.child(div().id(`${eid}-quote`).pl(8).border_l(2).border_color(t.border).text_color(t.dim)
-            .child(this.body(t, `${eid}-quote`, e.quote, known, 11))))
+            .child(this.body(t, `${eid}-quote`, e.quote, known, 11, e.name))))
           .children(e.questions.map((q, n) => h_flex().id(`${eid}-q${n}`).gap(4).items_start().min_w(0)
             .child(div().flex_none().text_size(11.5).child("❓"))
-            .child(this.body(t, `${eid}-q${n}`, q, known, 11.5))))
+            .child(this.body(t, `${eid}-q${n}`, q, known, 11.5, e.name))))
           .children(e.answers.map((a, n) => v_flex().id(`${eid}-a${n}`).px(6).py(4).rounded(4).bg(t.chrome).gap(2)
             .child(div().text_size(10.5).text_color(t.done).child(plain(a.head)))
-            .child(this.body(t, `${eid}-a${n}`, a.body))))
+            .child(this.body(t, `${eid}-a${n}`, a.body, known, 12, e.name))))
           .when(e.draft.length > 0, (el) => el.child(this.drafts(t, eid, e.draft)))
           .child(editing ? this.editor(t, e.key, e.draft.length > 0)
             : h_flex().child(this.btn(t, `${eid}-more`, e.answers.length > 0 ? "Ask more" : "Ask", (cx) => this.openEditor(e.key, e.name, cx), { disabled: Boolean(this.busy) })));
@@ -401,7 +418,7 @@ export default class HarnessOverview extends View {
             .child(this.btn(t, `dd-send-${i}`, this.busy === g.qkey ? "Sending…" : `Send this card (${g.notes.length})`, (cx) =>
               this.act(g.qkey, ["answer", g.qkey], cx, (r) => `Sent ${r.sent ?? g.notes.length} note(s)${r.pinged === false ? " (manager not pinged)" : ""}`),
               { disabled: Boolean(this.busy), tip: "Send only this card's notes now" })))
-          .when(Boolean(g.excerpt), (el) => el.child(this.body(t, `dd-x-${i}`, g.excerpt, [], 11)))
+          .when(Boolean(g.excerpt), (el) => el.child(this.body(t, `dd-x-${i}`, g.excerpt, [], 11, g.title)))
           .children(g.notes.map((x) => note(g, x))))))
       .child(h_flex().h(48).flex_none().px(16).gap(8).items_center().border_t(1).border_color(t.border)
         .child(div().flex_1().text_size(11).text_color(t.dim).child("Send all sends every note as one batch."))
@@ -464,7 +481,8 @@ export default class HarnessOverview extends View {
     const root = v_flex().relative().size_full().min_h(0).bg(t.background ?? t.chrome)
       .on_key_down((e, cx) => {
         if (e.key !== "escape") return;
-        if (this.taskMenu) { this.taskMenu = false; cx.notify(); }
+        if (this.reader) { this.reader = null; cx.notify(); }
+        else if (this.taskMenu) { this.taskMenu = false; cx.notify(); }
         else if (this.showDrafts) { if (this.draftEdit) this.draftEdit = null; else this.showDrafts = false; cx.notify(); }
         else if (this.edit) { this.edit = null; cx.notify(); }
         else if (this.query) { this.query = ""; this.input.set_value(""); cx.notify(); }
@@ -494,9 +512,9 @@ export default class HarnessOverview extends View {
             .when(Boolean(b.kind), (el) => el.child(this.chip(t, `bl-k-${b.address}`, b.kind, t.blocked)))
             .when(Boolean(b.since), (el) => el.child(this.chip(t, `bl-a-${b.address}`, `asked ${ago(b.since)}`, t.dim, b.since)))
             .when(Boolean(b.harness?.state), (el) => el.child(this.chip(t, `bl-h-${b.address}`, `h.state ${b.harness.state}`, t.working)))))
-          .when(Boolean(b.question), (el) => el.child(this.body(t, `bl-q-${b.address}`, b.question, known, 11.5)))
-          .when(Boolean(b.harness?.ask), (el) => el.child(this.body(t, `bl-ask-txt-${b.address}`, `ask: ${b.harness.ask}`, known, 11)))
-          .when(Boolean(b.harness?.next), (el) => el.child(div().text_color(t.dim).child(this.body(t, `bl-n-${b.address}`, `next: ${b.harness.next}`, known, 11))))
+          .when(Boolean(b.question), (el) => el.child(this.body(t, `bl-q-${b.address}`, b.question, known, 11.5, `${b.address} · ${b.title ?? "question"}`)))
+          .when(Boolean(b.harness?.ask), (el) => el.child(this.body(t, `bl-ask-txt-${b.address}`, `ask: ${b.harness.ask}`, known, 11, `${b.address} · ask`)))
+          .when(Boolean(b.harness?.next), (el) => el.child(div().text_color(t.dim).child(this.body(t, `bl-n-${b.address}`, `next: ${b.harness.next}`, known, 11, `${b.address} · next`))))
           .when((b.cards ?? []).length > 0, (el) => el.child(h_flex().flex_wrap().gap(4).items_center()
             .child(div().text_size(10.5).text_color(t.dim).child("on the board:"))
             .children([...b.cards.reduce((m, q) => m.set(q.split("|")[0], (m.get(q.split("|")[0]) ?? 0) + 1), new Map())].map(([col, n], k) => div().id(`bl-c-${b.address}-${k}`).px(5).py(1).rounded(4).border(1).border_color(t.border).text_size(10.5)
@@ -514,6 +532,7 @@ export default class HarnessOverview extends View {
         [...blockedRow, ...c.tasks.map((x) => this.taskCard(t, x)), h_flex().id("fyi-row").child(fyiToggle), ...(this.showFyi ? c.fyi.map((i) => this.card(t, i)) : [])]))
       .child(this.column(t, "questions", "Questions", c.answered.length + c.waiting.length, t.done,
         [...c.answered.map((b) => this.batchCard(t, b, known)), ...c.waiting.map((b) => this.batchCard(t, b, known))], { empty: "No open questions" })))
-      .when(this.showDrafts, (el) => el.child(this.draftsDialog(t, d)));
+      .when(this.showDrafts, (el) => el.child(this.draftsDialog(t, d)))
+      .when(Boolean(this.reader), (el) => el.child(this.readerDialog(t)));
   }
 }
