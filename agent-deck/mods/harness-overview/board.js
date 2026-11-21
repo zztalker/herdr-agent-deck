@@ -243,3 +243,41 @@ export function memo(f, size = 2000) {
     return v;
   };
 }
+
+// --- titles and cut-off text -------------------------------------------------------------------
+
+const firstLinkText = (md) => md.match(/\[([^\]]+)\]\([^)]*\)/)?.[1];
+
+// A queue card's title: its id; else the first bold text in it (a link inside it reads as its
+// text), else the first link's text; else its group; else its column.
+export function cardTitle(i) {
+  if (i.id) return i.id;
+  const text = i.text ?? "";
+  const bold = text.match(/\*\*([^*]+)\*\*/)?.[1];
+  const named = bold ? (firstLinkText(bold) ?? bold.replace(/`/g, "")) : firstLinkText(text);
+  return named?.trim() || i.group || i.column;
+}
+
+// A question entry's title: a URL name reads as the text its quote links it with, else shortTitle.
+export function entryTitle(e) {
+  const name = e.name ?? "";
+  if (/^https?:\/\//.test(name)) {
+    const esc = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const m = (e.quote ?? "").match(new RegExp(`\\[([^\\]]+)\\]\\(${esc}\\)`));
+    if (m) return m[1];
+  }
+  return shortTitle(name);
+}
+
+// Text someone cut short (an excerpt) may end inside a link or code span: a cut link shows its text
+// and "…", a lone [ or ` goes.
+export function repairCut(md) {
+  let s = (md ?? "").replace(/\[([^\]]*)\]\([^)]*$/, "$1…").replace(/…+$/, "…");
+  const open = s.lastIndexOf("[");
+  if (open >= 0 && !s.slice(open).includes("]")) s = s.slice(0, open) + s.slice(open + 1);
+  if ((s.match(/`/g) ?? []).length % 2) {
+    const last = s.lastIndexOf("`");
+    s = s.slice(0, last) + s.slice(last + 1);
+  }
+  return s;
+}

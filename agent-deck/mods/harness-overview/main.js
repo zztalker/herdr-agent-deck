@@ -14,13 +14,13 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, Popup } from "gpui-base";
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
-import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo } from "./board.js";
+import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut } from "./board.js";
 import { formatText } from "./format.js";
 
 const SHORT = 140; // visible characters of a card's text before "more" (which opens the reader)
 // A text's links and its short cut, kept by text and sessions: render runs on every change.
 const shortText = memo((md, addrs) => {
-  const full = linkify(md, addrs ? addrs.split("\n").map((address) => ({ address })) : []);
+  const full = linkify(repairCut(md), addrs ? addrs.split("\n").map((address) => ({ address })) : []);
   return { full, ...cutMarkdown(full, SHORT) };
 });
 const QS_WORD = { waiting: "question sent", answered: "answered", "ok-sent": "OK sent", accepted: "accepted" };
@@ -255,15 +255,15 @@ export default class HarnessOverview extends View {
   card(t, i) {
     const id = `it-${i.qkey}`;
     const editing = this.edit?.key === i.qkey;
-    const head = i.id ?? i.group ?? i.column;
+    const head = cardTitle(i);
     const qs = i.question;
     const extra = (i.links ?? []).filter((u) => !(i.text ?? "").includes(u));
     return v_flex().id(id).flex_none().w_full().px(10).py(8).gap(5).rounded(8).bg(t.surface)
       .border(1).border_color(editing ? t.accent : i.column === "Urgent" ? t.blocked : t.border)
       .child(h_flex().gap(6).items_center().min_w(0)
         .child(div().flex_none().font_semibold().text_size(12).text_color(t.foreground).child(head))
-        .when(Boolean(i.id && i.group), (el) => el.child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(i.group)))
-        .when(!(i.id && i.group), (el) => el.child(div().flex_1()))
+        .when(Boolean(i.group && head !== i.group), (el) => el.child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(i.group)))
+        .when(!(i.group && head !== i.group), (el) => el.child(div().flex_1()))
         .when(Boolean(i.due), (el) => el.child(this.chip(t, `${id}-due`, `due ${i.due}`, t.working)))
         .when(Boolean(qs), (el) => el.child(this.chip(t, `${id}-qs`, QS_WORD[qs] ?? qs, qs === "answered" ? t.done : t.accent)))
         .when(Boolean(i.age), (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child(i.age))))
@@ -306,12 +306,12 @@ export default class HarnessOverview extends View {
   }
 
   // A card's title: a link reads as people name it (app!183) and opens on click; the full name on hover.
-  title(t, id, name, maxW) {
+  title(t, id, name, maxW, label = null) {
     const isUrl = /^https?:\/\//.test(name ?? "");
     return div().id(id).flex_shrink_1().min_w(0).max_w(maxW).truncate().font_semibold().text_size(12).text_color(isUrl ? t.accent : t.foreground)
       .tooltip(name ?? "")
       .when(isUrl, (el) => el.cursor_pointer().hover((s) => s.underline()).on_click((_e, cx) => { cx.stop_propagation(); this.openLink(name); }))
-      .child(shortTitle(name));
+      .child(label ?? shortTitle(name));
   }
 
   batchCard(t, b, known = []) {
@@ -325,11 +325,11 @@ export default class HarnessOverview extends View {
       .children(b.entries.map((e, k) => {
         const eid = `${id}-e${k}`;
         const editing = this.edit?.key === e.key;
-        const thread = () => threadMarkdown(e.name, threadOf(this.view?.batches, e.name), (x) => formatText(linkify(x, known)));
-        const openThread = (cx) => { this.reader = { title: `${shortTitle(e.name)} · thread`, md: thread() }; cx.notify(); };
+        const thread = () => threadMarkdown(e.name, threadOf(this.view?.batches, e.name), (x) => formatText(linkify(repairCut(x), known)));
+        const openThread = (cx) => { this.reader = { title: `${entryTitle(e)} · thread`, md: thread() }; cx.notify(); };
         return v_flex().id(eid).gap(4).pt(4).border_t(1).border_color(t.border)
           .child(h_flex().gap(6).items_center().min_w(0)
-            .child(this.title(t, `${eid}-title`, e.name, 320))
+            .child(this.title(t, `${eid}-title`, e.name, 320, entryTitle(e)))
             .when(Boolean(e.where), (el) => el.child(this.chip(t, `${eid}-where`, `asked from ${e.where}`, t.dim)))
             .child(div().flex_1())
             .child(div().id(`${eid}-thread`).flex_none().text_size(11).text_color(t.accent).cursor_pointer().hover((s) => s.underline())

@@ -57,7 +57,7 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 | Field | Meaning |
 | --- | --- |
 | `qkey` | Unique key; the buttons pass it back as `KEY`. |
-| `id`, `group` | Title line: the id in bold, the group dimmed (the group alone when there's no id). |
+| `id`, `group` | Title line: the id, else the first bold or link text in `text`, else the group, else the column; the group dimmed beside it. |
 | `text` | Markdown, shown as such. Links, bare URLs (named as people name them: `app!183`, `tool#12`, `app job 4506831`, `ABC-123`, else host/…/last part) and the card's session addresses are clickable (a session goes to it; so does `tN` or `other-name/tN` when exactly one listed session ends in `/tN`). Cut at about 140 visible characters so cards stay small; "more" opens the whole text, formatted, in a reader window (see **Reader** below). |
 | `age`, `due`, `rec` | Optional: "16h" at the right, a `due 2026-01-07` chip, a `★ recommendation` line. |
 | `tasks` | Task names, as chips. |

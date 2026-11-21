@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -301,4 +301,30 @@ test("memo: computes once per key, then returns the same result; forgets the old
   f("y", "1"); f("z", "1"); // x drops out (size 2)
   f("x", "1");
   assert.equal(calls, 4);
+});
+
+// --- titles and cut-off text -------------------------------------------------------------------
+
+test("cardTitle: the id, else the first bold or link text, else the group, else the column", () => {
+  assert.equal(cardTitle({ id: "D1", text: "**D1** x", column: "Decide" }), "D1");
+  assert.equal(cardTitle({ id: null, text: "**[ER-3 report](https://c.ai/a)** · **from `vm/t19`**: x", column: "On review" }), "ER-3 report");
+  assert.equal(cardTitle({ id: null, text: "**Needs a rebase** now", column: "Urgent" }), "Needs a rebase");
+  assert.equal(cardTitle({ id: null, text: "see [app!1](https://x.io/1) soon", column: "FYI" }), "app!1");
+  assert.equal(cardTitle({ id: null, group: "Merges", text: "plain words", column: "Decide" }), "Merges");
+  assert.equal(cardTitle({ id: null, text: "plain words", column: "FYI" }), "FYI");
+});
+
+test("entryTitle: a URL name reads as the text the quote links it with, else as shortTitle", () => {
+  const url = "https://c.ai/artifact/1osuAX";
+  assert.equal(entryTitle({ name: url, quote: `[on review] **[ER-1 report](${url})** · from` }), "ER-1 report");
+  assert.equal(entryTitle({ name: "https://git.example.com/g/app/-/merge_requests/5", quote: "x" }), "app!5");
+  assert.equal(entryTitle({ name: "R3", quote: "x" }), "R3");
+});
+
+test("repairCut: a link cut off in the middle shows its text and …; whole links stay", () => {
+  assert.equal(repairCut("triage of [imunify MRs](https://git.example.com/g…"), "triage of imunify MRs…");
+  assert.equal(repairCut("see [half text"), "see half text");
+  assert.equal(repairCut("ok [a](https://x.io) done"), "ok [a](https://x.io) done");
+  assert.equal(repairCut("code `not closed"), "code not closed");
+  assert.equal(repairCut(""), "");
 });
