@@ -126,16 +126,22 @@ export const NO_TASK = "\u0000none";
 const tagsOf = (x) => x.tasks ?? (x.task ? [x.task] : []);
 
 // {tasks: [[name, cards]], none}: every card (items, tasks, question batches, blocked sessions).
+// Every task any card carries, sorted; the counts are of the cards waiting on you: Needs you +
+// Reviews as shown (not the asked ones, which sit in In progress). `none`: such cards with no
+// task; `all`: every such card.
 export function taskOptions(data) {
   const cards = [...(data?.sections ?? []).flatMap((s) => s.items), ...(data?.tasks ?? []), ...(data?.batches ?? []), ...(data?.blocked ?? [])];
   const n = new Map();
+  for (const c of cards) for (const t of tagsOf(c)) n.set(t, 0);
+  const c = columns(data ?? {});
+  const yours = [...c.needs, ...c.reviews];
   let none = 0;
-  for (const c of cards) {
-    const tags = [...new Set(tagsOf(c))];
+  for (const x of yours) {
+    const tags = [...new Set(tagsOf(x))];
     if (!tags.length) none++;
-    for (const t of tags) n.set(t, (n.get(t) ?? 0) + 1);
+    for (const t of tags) n.set(t, n.get(t) + 1);
   }
-  return { tasks: [...n].sort((a, b) => a[0].localeCompare(b[0])), none };
+  return { tasks: [...n].sort((a, b) => a[0].localeCompare(b[0])), none, all: yours.length };
 }
 
 // null: every card; NO_TASK: cards with no task; else cards of that task.

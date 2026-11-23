@@ -74,7 +74,7 @@ A Needs-you or Reviews card with a `question` status (you already asked or answe
 
 **blocked**: sessions waiting on a dialog, shown on top of In progress: `{ "address", "task", "title" (its tab), "kind" (`question`, …), "question" (what the dialog asks, markdown), "since" (ISO time asked), "harness": { "state", "next", "ask", "result" } (any notes the session keeps), "cards": [qkey] (queue cards naming it) }`; only `address` is required. The card shows the title, `kind · asked 18h ago · h.state …` chips, the question, `ask:` and `next:` notes, and `on the board: Urgent · Decide ×3` chips that filter the board to that session.
 
-The filter box matches every word against ids, groups, text, tasks, sessions and answers. The **Task** drop-list (All, each task with its number of cards, No task) shows one task's cards: queue cards and batches by their `tasks`, task cards and blocked sessions by their `task`. The pick is remembered.
+The filter box matches every word against ids, groups, text, tasks, sessions and answers. The **Task** drop-list (All, each task, No task; each with its number of cards waiting on you: in Needs you and Reviews, not counting asked ones or the other columns, so a task can show 0) shows one task's cards: queue cards and batches by their `tasks`, task cards and blocked sessions by their `task`. The pick is remembered.
 
 **note** (a draft; in `draft` and on cards): `{ "nid", "qkey", "text", "at" }`, plus for the Drafts dialog's titles `id` or `name` (else `key`), `column` or `where`, `group` and `excerpt` (all optional).
 

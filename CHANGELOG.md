@@ -4,6 +4,9 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 
 ## 2026-11-23
 
+### Changed
+- **Harness board, task list numbers:** the numbers in the Task drop-list (All, each task, No task) count only the cards in Needs you and Reviews: what waits on you. Tasks with none still show, with 0. Test: `taskOptions` in `board.test.mjs`.
+
 ### Added
 - **Harness board, ACK an answer:** an answered question batch has **ACK** beside **OK**: read, nothing to send. It hides behind an `ACKs (N)` toggle in Questions, like FYI, with **Un-ACK** to bring it back; nothing is sent and the script isn't called. A new answer on the batch brings it back. Tests: `ackKey`, `splitAcks`, `keepAcks` in `board.test.mjs`.
 - **Hidden tags:** labels starting with `h.` (the harness's notes on a session, such as `h.state` and `h.next`) no longer show as chips on the Overview's cards. The label editor (the tag icon) still has them, folded under **Hidden tags (N)**: click to show and edit them. Tests: `customLabels` in `agent-deck-overview/labels.test.mjs`, `hiddenKey` in `agent-deck-labels/edit.test.mjs`.

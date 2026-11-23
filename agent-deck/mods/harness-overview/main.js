@@ -419,12 +419,11 @@ export default class HarnessOverview extends View {
 
   // The task drop-list: All, each task with its card count, No task.
   taskPicker(t, d) {
-    const { tasks, none } = taskOptions(d);
+    const { tasks, none, all } = taskOptions(d);
     const f = this.taskFilter;
-    const all = (d?.sections ?? []).reduce((n, s) => n + s.items.length, 0) + (d?.tasks?.length ?? 0) + (d?.batches?.length ?? 0) + (d?.blocked?.length ?? 0);
     const trigger = h_flex().id("task").flex_none().max_w(240).h(28).px(8).gap(6).items_center().rounded(7).border(1).border_color(f !== null ? t.accent : t.border).bg(t.chrome)
       .text_size(12).cursor_pointer().hover((s) => s.bg(t.hover))
-      .tooltip("Show one task's cards")
+      .tooltip("Show one task's cards. The numbers: its cards in Needs you + Reviews")
       .on_click((_e, cx) => { this.taskMenu = !this.taskMenu; cx.notify(); })
       .child(div().flex_none().text_color(t.dim).child("Task"))
       .child(div().min_w(0).truncate().text_color(t.foreground).child(f === null ? "All" : f === NO_TASK ? "No task" : f))

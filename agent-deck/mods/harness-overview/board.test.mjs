@@ -166,9 +166,16 @@ const TD = {
   blocked: [{ address: "vm/t1", task: "b" }],
 };
 
-test("taskOptions: every task once, sorted, with how many cards carry it; then how many carry none", () => {
-  assert.deepEqual(taskOptions(TD), { tasks: [["a", 3], ["b", 2], ["c", 1]], none: 1 });
-  assert.deepEqual(taskOptions({}), { tasks: [], none: 0 });
+test("taskOptions: every task once, sorted, counting its cards in Needs you + Reviews; then none, then all", () => {
+  // D1 (a, b) and D2 (no task) are in Needs you; tasks, batches and blocked sessions count 0.
+  assert.deepEqual(taskOptions(TD), { tasks: [["a", 1], ["b", 1], ["c", 0]], none: 1, all: 2 });
+  const more = { ...TD, sections: [...TD.sections,
+    { column: "On review", items: [item("On review", "R1", { tasks: ["c"] }), item("On review", "R2", { tasks: ["c"], question: "waiting" })] },
+    { column: "FYI", items: [item("FYI", "F1", { tasks: ["a"] })] },
+    { column: "Urgent", items: [item("Urgent", "U1", { tasks: ["b"], question: "answered" })] }] };
+  // R1 counts; R2 and U1 (asked: In progress) and F1 (FYI) don't, but their tasks are listed.
+  assert.deepEqual(taskOptions(more), { tasks: [["a", 1], ["b", 1], ["c", 1]], none: 1, all: 3 });
+  assert.deepEqual(taskOptions({}), { tasks: [], none: 0, all: 0 });
 });
 
 test("keepTask: null keeps all, NO_TASK keeps cards without a task, a name keeps its cards", () => {
