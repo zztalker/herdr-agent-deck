@@ -468,7 +468,7 @@ export default class HarnessOverview extends View {
       this.act("tell", ["tell", text], cx, () => { this.message = null; this.messageText.set_value(""); return "Sent to the manager"; });
     };
     const mgr = d?.manager?.address;
-    const panel = v_flex().id("message").w(620).max_h_full().min_h(0).rounded(10).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg()
+    const panel = v_flex().id("message").w(620).h(400).max_h_full().min_h(0).rounded(10).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg()
       .on_click((_e, cx) => cx.stop_propagation())
       .child(h_flex().h(44).flex_none().px(16).gap(10).items_center().border_b(1).border_color(t.border)
         .child(div().text_size(14).font_semibold().text_color(t.foreground).child("Message to the manager"))
@@ -481,7 +481,7 @@ export default class HarnessOverview extends View {
           .child(div().flex_none().pr(4).text_size(11.5).text_color(t.dim).child("For"))
           .child(pick("none", null, "No task"))
           .children(tasks.map((k, i) => pick(i, k, k))))
-        .child(Textarea.new(this.messageText).w_full().text_size(12.5).rounded(6).border(1).border_color(t.accent).bg(t.chrome).p(8))
+        .child(Textarea.new(this.messageText).w_full().flex_none().text_size(12.5).rounded(6).border(1).border_color(t.accent).bg(t.chrome).p(8))
         .child(div().text_size(11).text_color(t.dim).whitespace_normal()
           .child(m.task ? `Goes as "for ${m.task}: …", now, with hc send. Not sent while the manager waits on a dialog.` : "Goes as written, now, with hc send. Not sent while the manager waits on a dialog.")))
       .child(h_flex().h(48).flex_none().px(16).gap(8).items_center().border_t(1).border_color(t.border)
