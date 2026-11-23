@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -71,6 +71,20 @@ test("needs you: urgent first, then decisions; reviews: ready to merge, then on 
   assert.deepEqual(c.fyi.map((i) => i.id), ["F1"]);
 });
 
+test("a Needs-you or Reviews card you already asked or answered about moves to In progress (asked)", () => {
+  const data = { sections: [
+    { column: "Urgent", items: [item("Urgent", "U1"), item("Urgent", "U2", { question: "waiting" })] },
+    { column: "Decide", items: [item("Decide", "D1", { question: "answered" }), item("Decide", "D2"), item("Decide", "D3", { question: "ok-sent" }), item("Decide", "D4", { question: "accepted" })] },
+    { column: "Ready to merge", items: [item("Ready to merge", "M1", { question: "answered" })] },
+    { column: "On review", items: [item("On review", "R1", { question: "waiting" }), item("On review", "R2")] },
+  ] };
+  const c = columns(data);
+  assert.deepEqual(c.needs.map((i) => i.id), ["U1", "D2"]);
+  assert.deepEqual(c.reviews.map((i) => i.id), ["R2"]);
+  assert.deepEqual(c.asked.map((i) => i.id), ["U2", "D1", "D3", "D4", "M1", "R1"], "Needs you first, then Reviews");
+  assert.deepEqual(columns(data, (x) => x.id === "D1").asked.map((i) => i.id), ["D1"], "the filter applies");
+});
+
 test("in progress: tasks waiting on you first, closed ones left out; blocked sessions kept", () => {
   const c = columns(DATA);
   assert.deepEqual(c.tasks.map((t) => t.task), ["b", "a"]);
@@ -91,7 +105,7 @@ test("a filter keeps what matches and leaves the counts of the rest", () => {
 
 test("missing parts read as empty", () => {
   const c = columns({});
-  assert.deepEqual([c.needs, c.reviews, c.fyi, c.tasks, c.blocked, c.answered, c.waiting], [[], [], [], [], [], [], []]);
+  assert.deepEqual([c.needs, c.asked, c.reviews, c.fyi, c.tasks, c.blocked, c.answered, c.waiting], [[], [], [], [], [], [], [], []]);
 });
 
 test("matches: every typed word appears in the card, its tasks or its sessions", () => {
@@ -341,6 +355,7 @@ test("the timed refresh waits while you type an answer or read the reader", () =
   assert.equal(dueRefresh({ ...s, edit: { key: "k" } }, now), false, "typing an answer");
   // A re-render under the reader sent its scroll back to the top.
   assert.equal(dueRefresh({ ...s, reader: { title: "t", md: "long" } }, now), false, "reading");
+  assert.equal(dueRefresh({ ...s, message: { task: null } }, now), false, "writing to the manager");
 });
 
 // --- Esc -------------------------------------------------------------------------------
@@ -355,4 +370,41 @@ test("Esc closes the innermost thing first, the board last", () => {
   assert.equal(escapeStep({ ...none, showDrafts: true, taskMenu: true }), "taskMenu");
   // The reader sits over everything, the Drafts dialog included.
   assert.equal(escapeStep({ ...none, reader: { md: "x" }, showDrafts: true, edit: { key: "k" }, query: "x" }), "reader");
+  // The Message dialog sits over the board, under the reader.
+  assert.equal(escapeStep({ ...none, message: { task: "x" }, taskMenu: true, edit: { key: "k" } }), "message");
+  assert.equal(escapeStep({ ...none, message: { task: "x" }, reader: { md: "x" } }), "reader");
+});
+
+// --- the Message button -------------------------------------------------------------------
+
+test("a message to the manager says which task it is for", () => {
+  assert.equal(messageText("release", "  hold the tag \n"), "for release: hold the tag");
+  assert.equal(messageText(null, "hello"), "hello", "no task: the text as written");
+  assert.equal(messageText("release", "   "), "", "nothing to send");
+});
+
+test("the Message dialog starts on the task the board shows", () => {
+  assert.equal(messageTask("release"), "release");
+  assert.equal(messageTask(null), null, "All tasks");
+  assert.equal(messageTask(NO_TASK), null, "No task");
+});
+
+// --- ACK -------------------------------------------------------------------------------------
+
+const answeredBatch = (sent, answers) => ({ sent, status: "answered", entries: [{ name: "R1", answers: Array.from({ length: answers }, (_, i) => ({ head: `a${i}`, body: "x" })) }] });
+
+test("an ACKed answer hides behind ACKs; a new answer brings it back", () => {
+  const b1 = answeredBatch("s1", 1), b2 = answeredBatch("s2", 2);
+  const acks = [ackKey(b1)];
+  assert.deepEqual(splitAcks([b1, b2], acks), { open: [b2], acked: [b1] });
+  const later = answeredBatch("s1", 2); // the manager answered again
+  assert.deepEqual(splitAcks([later, b2], acks), { open: [later, b2], acked: [] });
+  assert.deepEqual(splitAcks([b1], []), { open: [b1], acked: [] });
+  assert.deepEqual(splitAcks([b1], null), { open: [b1], acked: [] }, "nothing stored yet");
+});
+
+test("stored ACKs keep only batches still on the board", () => {
+  const b1 = answeredBatch("s1", 1);
+  assert.deepEqual(keepAcks([ackKey(b1), "gone|1", ackKey(answeredBatch("s1", 3))], [b1]), [ackKey(b1)]);
+  assert.deepEqual(keepAcks("nope", [b1]), [], "a stored value it can't read");
 });

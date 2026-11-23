@@ -8,14 +8,14 @@
 //   { "command": "python3 ~/path/to/board.py", "every": 120 }
 // optional "on": a machine to run it on. Without it the page says so and runs nothing.
 // It is run as `<command> json` every `every` seconds while the page is open and after each action;
-// the buttons run `answer KEY [TEXT]`, `draft add KEY TEXT`, `draft del NID`, `send` and `ok SENT`.
+// the buttons run `answer KEY [TEXT]`, `draft add KEY TEXT`, `draft del NID`, `send`, `ok SENT` and `tell TEXT`.
 // Each prints one JSON object. The format: README.md here; a working example: example/board.py.
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, Popup } from "gpui-base";
 import { platform } from "process";
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
-import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep } from "./board.js";
+import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks } from "./board.js";
 import { formatText } from "./format.js";
 
 const MAC = platform === "macos"; // ⌘C on macOS, Ctrl+C elsewhere
@@ -46,6 +46,10 @@ export default class HarnessOverview extends View {
     this.reader = null; // {title, md}: the text "more" opened
     this.focus = cx.focus_handle(); // the page's own, so Esc reaches escape() (see render)
     this.showFyi = false;
+    // ACKed answers (ackKey): read, nothing to send; behind the ACKs toggle. This page only.
+    this.acks = [];
+    try { this.acks = JSON.parse(localStorage.getItem("acks") ?? "[]"); } catch {}
+    this.showAcks = false;
     this.query = "";
     // null: every task; NO_TASK: cards with none; else that task. The last pick is remembered.
     this.taskFilter = null;
@@ -58,15 +62,18 @@ export default class HarnessOverview extends View {
     this.input = InputState.new({ placeholder: "Filter: id, task, session, text…" });
     this.input.on("change", (_e, cx) => { this.query = this.input.value(); cx.notify(); });
     this.answer = TextareaState.new({ placeholder: "Your answer or question…", rows: 4 });
+    this.message = null; // {task}: the Message dialog, a note to the manager
+    this.messageText = TextareaState.new({ placeholder: "Your message to the manager…", rows: 6 });
     if (checking()) return;
     this.load(cx);
-    // `harness-overview.drafts` opens the Drafts dialog, `.refresh` rereads, `.task <name>` / `.task`
+    // `harness-overview.drafts` opens the Drafts dialog, `.message` the Message dialog, `.refresh` rereads, `.task <name>` / `.task`
     // (all) pick the task (keys can name them).
     cx.spawn(async (cx) => {
       for (;;) {
         const c = await nextCommand();
         if (c === "drafts") { this.showDrafts = !this.showDrafts; cx.notify(); }
         if (c === "refresh") this.load(cx);
+        if (c === "message") this.openMessage(cx);
         if (c === "task") this.setTaskFilter(null, cx);
         else if (typeof c === "string" && c.startsWith("task ")) this.setTaskFilter(c.slice(5).trim() || null, cx);
       }
@@ -130,6 +137,7 @@ export default class HarnessOverview extends View {
     const step = escapeStep(this);
     if (step === "close") return this.dismiss();
     if (step === "reader") this.reader = null;
+    else if (step === "message") this.message = null;
     else if (step === "taskMenu") this.taskMenu = false;
     else if (step === "draftEdit") this.draftEdit = null;
     else if (step === "drafts") this.showDrafts = false;
@@ -342,14 +350,28 @@ export default class HarnessOverview extends View {
       .child(label ?? shortTitle(name));
   }
 
-  batchCard(t, b, known = []) {
+  setAck(b, on, cx) {
+    const k = ackKey(b);
+    const rest = keepAcks(this.acks, this.view?.batches ?? []).filter((x) => x !== k);
+    this.acks = on ? [...rest, k] : rest;
+    try { localStorage.setItem("acks", JSON.stringify(this.acks)); } catch {}
+    cx.notify();
+  }
+
+  batchCard(t, b, known = [], acked = false) {
     const id = `qb-${b.sent}`;
+    const last = b.entries.length - 1;
+    const batchBtns = [
+      ...(b.status === "answered" && !acked ? [this.btn(t, `${id}-ack`, "ACK", (cx) => this.setAck(b, true, cx),
+        { tip: "Read, nothing to send: hide it under ACKs. The manager isn't told; a new answer brings it back" })] : []),
+      ...(acked ? [this.btn(t, `${id}-unack`, "Un-ACK", (cx) => this.setAck(b, false, cx), { tip: "Back to the open questions" })] : []),
+      ...(b.status === "answered" ? [this.btn(t, `${id}-ok`, this.busy === `ok-${b.sent}` ? "…" : "OK", (cx) =>
+        this.act(`ok-${b.sent}`, ["ok", b.sent], cx, () => "Answer accepted"), { primary: true, disabled: Boolean(this.busy), tip: "Tell the manager the answer is OK" })] : []),
+    ];
     return v_flex().id(id).flex_none().w_full().px(10).py(8).gap(6).rounded(8).bg(t.surface).border(1).border_color(b.status === "answered" ? t.done : t.border)
       .child(h_flex().gap(6).items_center()
         .child(div().flex_1().text_size(11).text_color(t.dim).child(`batch ${b.sent}`))
-        .child(this.chip(t, `${id}-st`, QS_WORD[b.status] ?? b.status, b.status === "answered" ? t.done : t.accent))
-        .when(b.status === "answered", (el) => el.child(this.btn(t, `${id}-ok`, this.busy === `ok-${b.sent}` ? "…" : "OK", (cx) =>
-          this.act(`ok-${b.sent}`, ["ok", b.sent], cx, () => "Answer accepted"), { primary: true, disabled: Boolean(this.busy), tip: "Tell the manager the answer is OK" }))))
+        .child(this.chip(t, `${id}-st`, QS_WORD[b.status] ?? b.status, b.status === "answered" ? t.done : t.accent)))
       .children(b.entries.map((e, k) => {
         const eid = `${id}-e${k}`;
         const editing = this.edit?.key === e.key;
@@ -374,8 +396,13 @@ export default class HarnessOverview extends View {
             .child(this.body(t, `${eid}-a${n}`, a.body, known, 12, e.name, thread))))
           .when(e.draft.length > 0, (el) => el.child(this.drafts(t, eid, e.draft)))
           .child(editing ? this.editor(t, e.key, e.draft.length > 0)
-            : h_flex().child(this.btn(t, `${eid}-more`, e.answers.length > 0 ? "Ask more" : "Ask", (cx) => this.openEditor(e.key, e.name, cx), { disabled: Boolean(this.busy) })));
-      }));
+            : h_flex().gap(6).items_center()
+              .child(this.btn(t, `${eid}-more`, e.answers.length > 0 ? "Ask more" : "Ask", (cx) => this.openEditor(e.key, e.name, cx), { disabled: Boolean(this.busy) }))
+              // The batch's own buttons sit at the foot of the card, beside the last entry's Ask more.
+              .when(k === last, (el) => el.child(div().flex_1()).children(batchBtns)))
+          .when(editing && k === last && batchBtns.length > 0, (el) => el.child(h_flex().gap(6).items_center().child(div().flex_1()).children(batchBtns)));
+      }))
+      .when(last < 0 && batchBtns.length > 0, (el) => el.child(h_flex().gap(6).items_center().child(div().flex_1()).children(batchBtns)));
   }
 
   column(t, id, title, count, color, children, { width, empty = "Nothing here" } = {}) {
@@ -413,6 +440,57 @@ export default class HarnessOverview extends View {
       .children(tasks.map(([k, n], i) => option(i, k, k, n)))
       .child(option("none", NO_TASK, "No task", none));
     return Popup.new("task-pop", trigger).flex_none().anchor("top_left").when(this.taskMenu, (el) => el.content(menu));
+  }
+
+  openMessage(cx) {
+    this.message = { task: messageTask(this.taskFilter) };
+    this.taskMenu = false;
+    this.showDrafts = false;
+    this.messageText.set_value("");
+    this.messageText.focus();
+    cx.notify();
+  }
+
+  // The Message dialog: a note to the manager now (`tell`), "for <task>: " in front when a task is picked.
+  messageDialog(t, d) {
+    const m = this.message;
+    const close = (cx) => { this.message = null; this.focus.focus(); cx.notify(); };
+    const pick = (id, value, label) => div().id(`msg-t-${id}`).flex_none().px(8).py(2).rounded(5).text_size(11.5).cursor_pointer().border(1)
+      .border_color(m.task === value ? t.accent : t.border).bg(m.task === value ? t.selected : t.chrome)
+      .text_color(value === null ? t.dim : t.foreground).hover((s) => s.bg(t.hover))
+      .on_click((_e, cx) => { cx.stop_propagation(); this.message = { task: value }; cx.notify(); })
+      .child(label);
+    const tasks = taskOptions(d).tasks.map(([k]) => k);
+    if (m.task && !tasks.includes(m.task)) tasks.unshift(m.task);
+    const send = (cx) => {
+      const text = messageText(m.task, this.messageText.value());
+      if (!text) return;
+      this.act("tell", ["tell", text], cx, () => { this.message = null; this.messageText.set_value(""); return "Sent to the manager"; });
+    };
+    const mgr = d?.manager?.address;
+    const panel = v_flex().id("message").w(620).max_h_full().min_h(0).rounded(10).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg()
+      .on_click((_e, cx) => cx.stop_propagation())
+      .child(h_flex().h(44).flex_none().px(16).gap(10).items_center().border_b(1).border_color(t.border)
+        .child(div().text_size(14).font_semibold().text_color(t.foreground).child("Message to the manager"))
+        .when(Boolean(mgr), (el) => el.child(div().text_size(12).text_color(t.dim).child(mgr)))
+        .child(div().flex_1())
+        .child(div().id("msg-close").p(4).rounded(4).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+          .tooltip("Close (Esc)").on_click((_e, cx) => close(cx)).child(svg("mods/workspace-chrome/x.svg").size(14))))
+      .child(v_flex().id("msg-body").flex_1().min_h(0).p(16).gap(10).overflow_y_scrollbar()
+        .child(h_flex().flex_wrap().gap(4).items_center()
+          .child(div().flex_none().pr(4).text_size(11.5).text_color(t.dim).child("For"))
+          .child(pick("none", null, "No task"))
+          .children(tasks.map((k, i) => pick(i, k, k))))
+        .child(Textarea.new(this.messageText).w_full().text_size(12.5).rounded(6).border(1).border_color(t.accent).bg(t.chrome).p(8))
+        .child(div().text_size(11).text_color(t.dim).whitespace_normal()
+          .child(m.task ? `Goes as "for ${m.task}: …", now, with hc send. Not sent while the manager waits on a dialog.` : "Goes as written, now, with hc send. Not sent while the manager waits on a dialog.")))
+      .child(h_flex().h(48).flex_none().px(16).gap(8).items_center().border_t(1).border_color(t.border)
+        .child(div().flex_1())
+        .child(this.btn(t, "msg-cancel", "Cancel", (cx) => close(cx)))
+        .child(this.btn(t, "msg-send", this.busy === "tell" ? "Sending…" : "Send", (cx) => send(cx), { primary: true, disabled: Boolean(this.busy) })));
+    return div().id("message-backdrop").absolute().inset_0().flex().items_center().justify_center().p(40).bg("#00000099")
+      .on_click((_e, cx) => close(cx))
+      .child(panel);
   }
 
   // The Drafts dialog: every saved note by card; edit, delete, send one card's or all.
@@ -483,7 +561,7 @@ export default class HarnessOverview extends View {
       .child(line("`<command> json` prints one JSON object (exit 0) with:"))
       .child(mono('{ "ok": true, "at": ISO time, "source": text, "manager": {address, status},\n  "sections": [{ "column": "Urgent" | "Decide" | "Ready to merge" | "On review" | "FYI", "items": [card] }],\n  "tasks": [{ task, title, state, column: "Active" | "Waiting on you" | "Closed", sessions, last }],\n  "batches": [{ sent, status: "waiting" | "answered" | "ok-sent" | "accepted", entries: [{ key, name, where, questions, answers, draft }] }],\n  "blocked": [{ address, task }], "draft": [note] }'))
       .child(line('card: { qkey, id, column, group, text (markdown), age, due, rec, tasks: [..], sessions: [{address, status}], links: [url], question, draft: [{nid, text}] }'))
-      .child(line('The buttons run `<command> answer KEY [TEXT]` (send now), `draft add KEY TEXT`, `draft edit NID TEXT`, `draft del NID`, `send` (every draft) and `ok SENT`, each printing { "ok": true | false, "error": … }.'))
+      .child(line('The buttons run `<command> answer KEY [TEXT]` (send now), `draft add KEY TEXT`, `draft edit NID TEXT`, `draft del NID`, `send` (every draft), `ok SENT` and `tell TEXT` (the Message button), each printing { "ok": true | false, "error": … }.'))
       .child(line(`Full description: ${appHome()}/mods/harness-overview/README.md`)));
   }
 
@@ -501,7 +579,8 @@ export default class HarnessOverview extends View {
 
     const header = h_flex().h(44).flex_none().px(16).gap(10).items_center().border_b(1).border_color(t.border)
       .child(div().text_size(15).font_semibold().text_color(t.foreground).child("Harness"))
-      .when(Boolean(mgr), (el) => el.child(this.sessionChip(t, "mgr", { address: mgr.address, status: mgr.status })))
+      .when(Boolean(mgr), (el) => el.child(this.sessionChip(t, "mgr", { address: mgr.address, status: mgr.status }))
+        .child(this.btn(t, "msg-btn", "Message", (cx) => this.openMessage(cx), { disabled: Boolean(this.busy), tip: "Write to the manager now; the task you pick goes in front" })))
       .when(Boolean(d), (el) => el.child(div().flex_shrink_1().min_w(0).truncate().text_size(11).text_color(t.dim)
         .tooltip(`${d.source} (${d.target}) · last commit: ${d.commit?.subject ?? ""}${d.commit?.dirty ? ` + ${d.commit.dirty} uncommitted` : ""}`)
         .child(`${d.source} · commit ${d.commit?.age ?? "?"} ago · read ${ago(d.at)}`)))
@@ -563,16 +642,27 @@ export default class HarnessOverview extends View {
               .child(n > 1 ? `${col} ×${n}` : col)))))
           .when(open || notes.length > 0, (el) => el.child(this.askRow(t, `bl-${b.address}`, key, "Ask", b.address)));
       }))];
+    // Needs-you cards you already asked or answered about: they wait on the harness now.
+    const askedRow = c.asked.length === 0 ? [] : [v_flex().id("asked").flex_none().gap(8)
+      .child(div().px(2).text_size(11).font_semibold().text_color(t.dim).child(`Asked or answered by you, waiting on the harness ${c.asked.length}`))
+      .children(c.asked.map((i) => this.card(t, i)))];
+    const acks = splitAcks(c.answered, this.acks);
+    const ackToggle = this.btn(t, "acks", this.showAcks ? `Hide ACKs (${acks.acked.length})` : `ACKs (${acks.acked.length})`, (cx) => { this.showAcks = !this.showAcks; cx.notify(); },
+      { tip: "Answers you ACKed: read, nothing sent" });
     const fyiToggle = this.btn(t, "fyi", this.showFyi ? `Hide FYI (${c.fyi.length})` : `FYI (${c.fyi.length})`, (cx) => { this.showFyi = !this.showFyi; cx.notify(); });
 
     return root.child(h_flex().id("body").flex_1().min_h(0).p(12).gap(10).items_stretch()
       .child(this.column(t, "needs", "Needs you", c.needs.length, t.blocked, c.needs.map((i) => this.card(t, i))))
       .child(this.column(t, "reviews", "Reviews", c.reviews.length, t.working, c.reviews.map((i) => this.card(t, i))))
-      .child(this.column(t, "progress", "In progress", c.tasks.length, t.ansi2 ?? t.accent,
-        [...blockedRow, ...c.tasks.map((x) => this.taskCard(t, x)), h_flex().id("fyi-row").child(fyiToggle), ...(this.showFyi ? c.fyi.map((i) => this.card(t, i)) : [])]))
-      .child(this.column(t, "questions", "Questions", c.answered.length + c.waiting.length, t.done,
-        [...c.answered.map((b) => this.batchCard(t, b, known)), ...c.waiting.map((b) => this.batchCard(t, b, known))], { empty: "No open questions" })))
+      .child(this.column(t, "progress", "In progress", c.tasks.length + c.asked.length, t.ansi2 ?? t.accent,
+        [...blockedRow, ...askedRow, ...c.tasks.map((x) => this.taskCard(t, x)), h_flex().id("fyi-row").child(fyiToggle), ...(this.showFyi ? c.fyi.map((i) => this.card(t, i)) : [])]))
+      .child(this.column(t, "questions", "Questions", acks.open.length + c.waiting.length, t.done,
+        [...acks.open.map((b) => this.batchCard(t, b, known)), ...c.waiting.map((b) => this.batchCard(t, b, known)),
+          ...(acks.acked.length ? [...(acks.open.length + c.waiting.length ? [] : [div().p(4).text_size(12).text_color(t.dim).child("No open questions")]),
+            h_flex().id("acks-row").child(ackToggle), ...(this.showAcks ? acks.acked.map((b) => this.batchCard(t, b, known, true)) : [])] : [])],
+        { empty: "No open questions" })))
       .when(this.showDrafts, (el) => el.child(this.draftsDialog(t, d)))
+      .when(Boolean(this.message), (el) => el.child(this.messageDialog(t, d)))
       .when(Boolean(this.reader), (el) => el.child(this.readerDialog(t)));
   }
 }

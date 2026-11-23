@@ -1,7 +1,7 @@
 // node --test edit.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { customLabels, knownValues, remember, suggest, labelArgs } from "./edit.js";
+import { customLabels, knownValues, remember, suggest, labelArgs, hiddenKey } from "./edit.js";
 
 // --- customLabels (the editor's starting rows) --------------------------------------
 
@@ -116,4 +116,19 @@ test("withTaskColor: no task, an unknown color or a missing map", () => {
 test("the color row's palettes are the rail's (agent-deck-agents/badge.js)", () => {
   assert.deepEqual(LABEL_COLOR_NAMES, RAIL_COLOR_NAMES);
   assert.deepEqual(LABEL_PALETTES, RAIL_PALETTES);
+});
+
+// --- hidden tags (h.*) ------------------------------------------------------------------
+
+test("h.* labels are hidden tags: still edited here, folded under Hidden tags", () => {
+  assert.equal(hiddenKey("h.state"), true);
+  assert.equal(hiddenKey("h."), true);
+  assert.equal(hiddenKey("hx"), false);
+  assert.equal(hiddenKey("h-state"), false);
+  assert.equal(hiddenKey("task"), false);
+  const before = { task: "PROJ-1", "h.state": "waiting", "h.next": "merge" };
+  assert.deepEqual(customLabels(before), [["h.next", "merge"], ["h.state", "waiting"], ["task", "PROJ-1"]]);
+  const rows = [["task", "PROJ-1"], ["h.state", "waiting"], ["h.next", "merge"]];
+  assert.deepEqual(labelArgs(before, rows), [], "kept folded: nothing to send");
+  assert.deepEqual(labelArgs(before, rows.filter(([k]) => k !== "h.next")), ["h.next="], "a removed hidden row still removes its label");
 });

@@ -4,10 +4,16 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 
 ## 2026-11-23
 
+### Added
+- **Harness board, ACK an answer:** an answered question batch has **ACK** beside **OK**: read, nothing to send. It hides behind an `ACKs (N)` toggle in Questions, like FYI, with **Un-ACK** to bring it back; nothing is sent and the script isn't called. A new answer on the batch brings it back. Tests: `ackKey`, `splitAcks`, `keepAcks` in `board.test.mjs`.
+- **Hidden tags:** labels starting with `h.` (the harness's notes on a session, such as `h.state` and `h.next`) no longer show as chips on the Overview's cards. The label editor (the tag icon) still has them, folded under **Hidden tags (N)**: click to show and edit them. Tests: `customLabels` in `agent-deck-overview/labels.test.mjs`, `hiddenKey` in `agent-deck-labels/edit.test.mjs`.
+- **Harness board, Message to the manager:** a **Message** button beside the manager in the header opens a dialog: pick the task (it starts on the one the board shows) and write; **Send** runs the script's new `tell TEXT` command with "for <task>: <text>". A failed send (the manager waits on a dialog) keeps the dialog and your text. The example script has `tell` too. Tests: `messageText`, `messageTask`, `escapeStep`, `dueRefresh` in `board.test.mjs`; `tell` in `example/test_board.py`.
+
 ### Fixed
 - **Harness board, reader keeps your place:** the timed refresh no longer sends a long text in the reader back to its top. It waits while the reader is open, as it already did while you typed an answer, and runs once you close it. Test: `dueRefresh` in `board.test.mjs`.
 - **Harness board, copy a part of the reader:** the reader says how: select the part and press `⌘C` (`Ctrl+C`); the button is now **Copy all**. A selection in the reader no longer picks up text from the cards behind it: they can't be selected while it is open.
 - **Harness board, Esc:** Esc closes the reader (then the Task menu, the Drafts dialog, the answer box, the filter) before the board. Herdr's Esc in a dialog overlay is `overlay.close`, a key binding that ran before the page's own key handler and closed the whole board; the page now takes that action itself and keeps the keyboard focus after a click on it. Test: `escapeStep` in `board.test.mjs`.
+- **Harness board, cards you asked or answered about leave Needs you and Reviews:** an Urgent, Decide, Ready to merge or On review card with a question status (sent, answered, OK sent, accepted) waits on the harness, not on you, so it shows under In progress, "Asked or answered by you, waiting on the harness", until the manager takes it off its list. Test: `columns` in `board.test.mjs`.
 
 ## 2026-11-21
 

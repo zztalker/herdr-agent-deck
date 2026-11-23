@@ -8,6 +8,10 @@ import { COLOR_NAMES } from "./colors.js";
 // (a mod can't import another mod's files).
 const reserved = (k) => k === "where" || k.startsWith("herdr.");
 
+// Hidden tags: the harness's own notes on a session (h.state, h.next…). The Overview cards don't
+// show them; here they are edited like any label, folded under "Hidden tags" until opened.
+export const hiddenKey = (k) => k.startsWith("h.");
+
 // The labels a person or an agent set, as [key, value] pairs sorted by key.
 export function customLabels(labels) {
   return Object.entries(labels ?? {})

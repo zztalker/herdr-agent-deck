@@ -1,6 +1,6 @@
 # harness-overview
 
-A full-window board for the work your agents do: what needs you, what is on review, tasks in progress, blocked sessions, and your questions with their answers. You answer a card from the board: **Send** sends it now, **Save draft** keeps it to send later.
+A full-window board for the work your agents do: what needs you, what is on review, tasks in progress, blocked sessions, and your questions with their answers. You answer a card from the board: **Send** sends it now, **Save draft** keeps it to send later. **Message**, beside the manager in the header, writes to the manager about anything.
 
 The data comes from a script of yours. Herdr only shows it and runs the script's commands when you press a button. Open it with `⌘⇧H` or the board icon beside the Overview icon at the foot of the Agents column.
 
@@ -13,7 +13,7 @@ Name the script in `~/.config/herdr-app/data/harness-overview/config.json`. That
 ```
 
 - `command`: run through `sh -c`, so `~` and `PATH` work. Arguments are added as separate words and never re-read by the shell.
-- `every`: seconds between refreshes while the page is open (default 120, at least 30). It also refreshes after every button and on **Refresh**. The timed refresh waits while you type an answer or read a text in the reader, so your place in it stays put, and runs once you close it.
+- `every`: seconds between refreshes while the page is open (default 120, at least 30). It also refreshes after every button and on **Refresh**. The timed refresh waits while you type an answer or a message, or read a text in the reader, so your place in it stays put, and runs once you close it.
 - `on` (optional): a machine name from `hc machine ls` to run the command on.
 
 Without the file, or without `command`, the page says the config is absent, shows this format, and runs nothing.
@@ -52,6 +52,8 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 | `FYI` | **In progress**, behind the FYI toggle |
 | anything else | not shown |
 
+A Needs-you or Reviews card with a `question` status (you already asked or answered about it) waits on the harness, not on you: it shows under **In progress**, "Asked or answered by you, waiting on the harness", until the script drops it or clears its status.
+
 **card:**
 
 | Field | Meaning |
@@ -68,7 +70,7 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 
 **task** (In progress; `Waiting on you` first, `Closed` left out): `task`, `title`, `state`, `column` (`Active`, `Waiting on you`, `Closed`), `sessions` (as on cards), `last` (latest log line).
 
-**batch** (Questions; `answered` first with an **OK** button, then `waiting` and `ok-sent`; `accepted` left out): `sent` (its id), `status`, `entries`: `[{ "key", "name", "where", "quote", "questions": [text], "answers": [{ "head", "body" }], "draft": [note] }]`. Each entry shows its `name` as its title (a URL reads as `app!183` and opens on click), an `asked from <where>` chip, its `quote` (the item as it read when asked; sessions any card names are links there), then the questions and answers. An entry with answers has **Ask more**, which uses its `key` as `KEY`. **Thread** (and "more" on its quote, questions or answers) opens the whole thread in the reader: every entry with the same `name` across the batches, oldest first, under what it was asked from and about.
+**batch** (Questions; `answered` first with **ACK** and **OK** buttons, then `waiting` and `ok-sent`; `accepted` left out): `sent` (its id), `status`, `entries`: `[{ "key", "name", "where", "quote", "questions": [text], "answers": [{ "head", "body" }], "draft": [note] }]`. Each entry shows its `name` as its title (a URL reads as `app!183` and opens on click), an `asked from <where>` chip, its `quote` (the item as it read when asked; sessions any card names are links there), then the questions and answers. An entry with answers has **Ask more**, which uses its `key` as `KEY`. **Thread** (and "more" on its quote, questions or answers) opens the whole thread in the reader: every entry with the same `name` across the batches, oldest first, under what it was asked from and about.
 
 **blocked**: sessions waiting on a dialog, shown on top of In progress: `{ "address", "task", "title" (its tab), "kind" (`question`, …), "question" (what the dialog asks, markdown), "since" (ISO time asked), "harness": { "state", "next", "ask", "result" } (any notes the session keeps), "cards": [qkey] (queue cards naming it) }`; only `address` is required. The card shows the title, `kind · asked 18h ago · h.state …` chips, the question, `ask:` and `next:` notes, and `on the board: Urgent · Decide ×3` chips that filter the board to that session.
 
@@ -76,9 +78,13 @@ The filter box matches every word against ids, groups, text, tasks, sessions and
 
 **note** (a draft; in `draft` and on cards): `{ "nid", "qkey", "text", "at" }`, plus for the Drafts dialog's titles `id` or `name` (else `key`), `column` or `where`, `group` and `excerpt` (all optional).
 
-**Esc** closes the innermost thing open: the reader, the Task menu, the Drafts dialog (its edit box first), the answer box, the filter, and only then the board.
+**Esc** closes the innermost thing open: the reader, the Message dialog, the Task menu, the Drafts dialog (its edit box first), the answer box, the filter, and only then the board.
+
+**ACK** on an answered batch means you read it and need nothing more, and tells nobody: unlike **OK**, it runs no command. The batch moves behind an `ACKs (N)` toggle at the foot of Questions (like FYI), where **Un-ACK** brings it back. The page keeps the ACKs itself (its local storage, this computer only), by batch and its number of answers, so a new answer on an ACKed batch shows it again.
 
 **Drafts dialog** (the `Drafts (N)` button): every draft by card, with ✎ (edit), ✕, `Send this card` per card and `Send all`.
+
+**Message dialog** (the **Message** button beside the manager; shown when the board has a `manager`): pick the task it is about (it starts on the task the board shows; **No task** for none) and write. **Send** runs `tell "for <task>: <text>"` (just the text with no task). On success the dialog closes; on an error it stays open with your text, so you can send again later.
 
 ### Reader
 
@@ -105,10 +111,11 @@ Links, autolinks and code spans are never split or changed.
 | Send this card (Drafts dialog) | `answer KEY` | send that card's drafts |
 | Send all (Drafts dialog) | `send` | send every draft |
 | OK | `ok SENT` | accept that batch's answer |
+| Send (Message dialog) | `tell TEXT` | send TEXT to the manager now; fail (`"ok": false`) when it can't, such as while the manager waits on a dialog a message would answer |
 
 **KEY** is a card's `qkey`, an answer entry's `key`, `task|<task>` (the **Ask** button on a task card; a task's own `key` if it has one) or `session|<address>` (**Ask** on a blocked session). For the last two the script should send your text with what it knows about that task or session, so the reader has the context.
 
-Commands for keys: `harness-overview.drafts` toggles the Drafts dialog, `harness-overview.refresh` rereads, `harness-overview.task <name>` / `harness-overview.task` pick a task / all.
+Commands for keys: `harness-overview.drafts` toggles the Drafts dialog, `harness-overview.message` opens the Message dialog, `harness-overview.refresh` rereads, `harness-overview.task <name>` / `harness-overview.task` pick a task / all.
 
 Each prints `{ "ok": true, … }` or `{ "ok": false, "error": "…" }`. After **Send** the page says "not pinged" when the reply has `"pinged": false`.
 
@@ -118,4 +125,4 @@ Each prints `{ "ok": true, … }` or `{ "ok": false, "error": "…" }`. After **
 - `example/board.py`: the example script (stdlib Python), tested in `example/test_board.py` (`python3 -m unittest test_board.py` from `example/`).
 - `kanban.svg`: Lucide `square-kanban` (ISC).
 
-What it runs: only your command (`exec sh -c`), and `open` / `xdg-open` for a link you click. It writes nothing itself.
+What it runs: only your command (`exec sh -c`), and `open` / `xdg-open` for a link you click. It writes nothing itself except its own local storage (the last board, the task pick, ACKs).

@@ -5,11 +5,14 @@
 // Herdr's own labels: never shown as chips. Same rule as agent-deck-labels/edit.js
 // (a mod can't import another mod's files).
 const reserved = (k) => k === "where" || k.startsWith("herdr.");
+// The harness's own notes on a session (h.state, h.next…): not shown on the cards; the label
+// editor folds them under Hidden tags (agent-deck-labels/edit.js hiddenKey).
+const hidden = (k) => k.startsWith("h.");
 
-// The labels a person or an agent set, as [key, value] pairs sorted by key.
+// The labels a person or an agent set, as [key, value] pairs sorted by key; no h.* ones.
 export function customLabels(labels) {
   return Object.entries(labels ?? {})
-    .filter(([k, v]) => v !== "" && !reserved(k))
+    .filter(([k, v]) => v !== "" && !reserved(k) && !hidden(k))
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
 }
 

@@ -100,6 +100,14 @@ class ExampleBoard(unittest.TestCase):
             rc, res = self.run_board("draft", "add", key, "x")
             self.assertEqual((rc, res["ok"]), (1, False), key)
 
+    def test_tell_sends_a_message_to_the_manager(self):
+        rc, res = self.run_board("tell", "for release: hold the tag")
+        self.assertEqual((rc, res["ok"], res["pinged"]), (0, True, True))
+        state = json.loads(pathlib.Path(self.env["BOARD_STATE"]).read_text())
+        self.assertEqual([m["text"] for m in state["told"]], ["for release: hold the tag"])
+        rc, res = self.run_board("tell", "  ")
+        self.assertEqual((rc, res["ok"]), (1, False))
+
     def test_errors_are_json_with_exit_1(self):
         for args in (["draft", "add", "nope", "x"], ["answer", "Decide|D1"], ["ok", "nope"], ["frobnicate"]):
             rc, res = self.run_board(*args)

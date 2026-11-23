@@ -10,7 +10,7 @@
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input } from "gpui-base";
 import { terminals, agents, panes, focused, hc, theme, props, closeOverlay, shared, setShared, settings } from "herdr";
-import { customLabels, knownValues, remember, suggest, labelArgs, withTaskColor } from "./edit.js";
+import { customLabels, knownValues, remember, suggest, labelArgs, withTaskColor, hiddenKey } from "./edit.js";
 import { COLOR_NAMES, PALETTES } from "./colors.js";
 
 // agent-deck: task -> color name, read by the Agents rail (agent-deck-agents/badge.js).
@@ -35,7 +35,8 @@ export default class Labels extends View {
     this.error = x ? null : this.address ? `${this.address} is not a live terminal` : "No terminal is focused";
     this.saving = false;
     this.rows = x ? [this.row("role", this.labels.role ?? "", true), this.row("task", this.labels.task ?? "", true),
-      ...customLabels(this.labels).filter(([k]) => k !== "role" && k !== "task").map(([k, v]) => this.row(k, v, false))] : [];
+      ...customLabels(this.labels).filter(([k]) => k !== "role" && k !== "task").map(([k, v]) => this.row(k, v, false, hiddenKey(k)))] : [];
+    this.showHidden = false; // the Hidden tags fold
     this.focus = this.rows[0] ?? null;
     // agent-deck: the color picked in the color row; undefined until one is clicked, so the row
     // shows what the Task field's task has saved.
@@ -43,9 +44,9 @@ export default class Labels extends View {
     this.focus?.v.focus();
   }
 
-  // One row; `fixed` rows (role, task) have no key field.
-  row(key, value, fixed) {
-    const r = { key, fixed };
+  // One row; `fixed` rows (role, task) have no key field; `hidden` ones (h.*) sit in the fold.
+  row(key, value, fixed, hidden = false) {
+    const r = { key, fixed, hidden };
     r.k = fixed ? null : InputState.new({ placeholder: "key", value: key });
     r.v = InputState.new({ placeholder: key === "task" ? "e.g. PROJ-1234" : key === "role" ? "e.g. reviewer" : "value", value });
     for (const s of [r.k, r.v].filter(Boolean)) {
@@ -163,6 +164,7 @@ export default class Labels extends View {
 
   render(_cx) {
     const t = theme();
+    const hiddenRows = this.rows.map((r, i) => [r, i]).filter(([r]) => r.hidden);
     const rowEl = (r, i) => {
       const sugg = this.focus === r ? this.suggestionsFor(r) : [];
       return v_flex().id(`lb-row-${i}`).gap(4)
@@ -195,7 +197,16 @@ export default class Labels extends View {
         .child(svg("mods/agent-deck-labels/tag.svg").size(14).flex_none().text_color(t.dim))
         .child(div().flex_none().font_semibold().text_color(t.foreground).child("Labels"))
         .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.dim).child(this.address ? `${this.name} · ${this.address}` : "")))
-      .child(v_flex().gap(8).children(this.rows.map(rowEl)))
+      .child(v_flex().gap(8).children(this.rows.map((r, i) => [r, i]).filter(([r]) => !r.hidden).map(([r, i]) => rowEl(r, i))))
+      .when(hiddenRows.length > 0, (el) => el.child(v_flex().gap(8)
+        .child(h_flex().child(div().id("lb-hidden").flex_none().px(8).py(3).rounded(6).text_size(12).text_color(t.dim).cursor_pointer()
+          .hover((s) => s.bg(t.hover).text_color(t.foreground))
+          .tooltip("The harness's h.* labels: not shown on the Overview cards")
+          .on_click((_e, cx) => { this.showHidden = !this.showHidden; cx.notify(); })
+          .child(h_flex().gap(4).items_center()
+            .child(svg(`mods/workspace-chrome/${this.showHidden ? "chevron-down" : "chevron-right"}.svg`).size(12))
+            .child(`Hidden tags (${hiddenRows.length})`))))
+        .when(this.showHidden, (el) => el.children(hiddenRows.map(([r, i]) => rowEl(r, i))))))
       .when(this.rows.length > 0, (el) => el.child(this.colorRow(t)))
       .when(this.rows.length > 0, (el) => el.child(h_flex().child(div().id("lb-add").flex_none().px(8).py(3).rounded(6).text_size(12).text_color(t.dim).cursor_pointer()
         .hover((s) => s.bg(t.hover).text_color(t.foreground))

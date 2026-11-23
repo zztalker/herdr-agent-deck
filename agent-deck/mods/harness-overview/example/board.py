@@ -14,6 +14,7 @@ Every command prints one JSON object and exits 1 when its "ok" is false. The for
   board.py answer KEY [TEXT]     send that card's drafts (+ TEXT) now
   board.py send                  send every draft as one batch
   board.py ok SENT               accept the answer to batch SENT
+  board.py tell TEXT             send TEXT to the manager now (the Message button)
 """
 import json
 import os
@@ -194,6 +195,13 @@ def main(argv):
         bt["status"] = "ok-sent"
         save(state)
         return out({"ok": True})
+    if cmd == "tell" and len(rest) == 1:
+        if not rest[0].strip():
+            return out({"ok": False, "error": "empty message"})
+        # A real script sends it to the manager here (`hc send <address> TEXT`); this one keeps it.
+        state.setdefault("told", []).append({"at": now().isoformat(timespec="seconds"), "text": rest[0].strip()})
+        save(state)
+        return out({"ok": True, "pinged": True})
     return out({"ok": False, "error": "unknown command; see the top of board.py"})
 
 

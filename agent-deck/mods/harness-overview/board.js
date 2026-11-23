@@ -38,9 +38,14 @@ export function columns(data, keep = () => true) {
   const tasks = (data?.tasks ?? []).filter((t) => t.column in TASK_ORDER).filter(keep)
     .sort((a, b) => TASK_ORDER[a.column] - TASK_ORDER[b.column]);
   const batches = (data?.batches ?? []).filter(keep);
+  // A Needs-you or Reviews card you already asked or answered about waits on the harness, not on
+  // you, until the manager takes it off its list: it shows under In progress ("asked") instead.
+  const needs = items(NEEDS);
+  const reviews = items(REVIEWS);
   return {
-    needs: items(NEEDS),
-    reviews: items(REVIEWS),
+    needs: needs.filter((i) => !i.question),
+    asked: [...needs, ...reviews].filter((i) => i.question),
+    reviews: reviews.filter((i) => !i.question),
     fyi: items(["FYI"]),
     tasks,
     blocked: data?.blocked ?? [],
@@ -286,16 +291,52 @@ export function repairCut(md) {
 // or reading the reader (a re-render under it sent its scroll back to the top). It runs on the
 // next tick after they close it.
 export function dueRefresh(s, now) {
-  return Boolean(s.config) && !s.loading && !s.edit && !s.reader && now - (s.loadedAt ?? 0) >= s.config.every * 1000;
+  return Boolean(s.config) && !s.loading && !s.edit && !s.reader && !s.message && now - (s.loadedAt ?? 0) >= s.config.every * 1000;
 }
 
 // What Esc closes: the innermost thing open, the board itself last. The reader sits over
 // everything; then the Task menu, the Drafts dialog (its edit box first), the answer box, the filter.
 export function escapeStep(s) {
   if (s.reader) return "reader";
+  if (s.message) return "message";
   if (s.taskMenu) return "taskMenu";
   if (s.showDrafts) return s.draftEdit ? "draftEdit" : "drafts";
   if (s.edit) return "edit";
   if (s.query) return "query";
   return "close";
+}
+
+// --- the Message button ------------------------------------------------------------------------
+
+// What `tell` sends: "for <task>: <text>", or the text alone with no task; "" when there's nothing.
+export function messageText(task, text) {
+  const body = (text ?? "").trim();
+  if (!body) return "";
+  return task ? `for ${task}: ${body}` : body;
+}
+
+// The task the Message dialog starts on: the one the board shows, else none.
+export function messageTask(filter) {
+  return filter === null || filter === NO_TASK ? null : filter;
+}
+
+// --- ACK -----------------------------------------------------------------------------------------
+
+// ACK: you read an answer and need nothing more, without telling the manager (unlike OK). Kept in
+// the page only, by batch and its number of answers, so a new answer brings the batch back.
+export function ackKey(b) {
+  const n = (b?.entries ?? []).reduce((k, e) => k + (e.answers?.length ?? 0), 0);
+  return `${b?.sent}|${n}`;
+}
+
+export function splitAcks(batches, acks) {
+  const set = new Set(Array.isArray(acks) ? acks : []);
+  return { open: batches.filter((b) => !set.has(ackKey(b))), acked: batches.filter((b) => set.has(ackKey(b))) };
+}
+
+// The stored ACKs that still match a batch on the board (the rest would only pile up).
+export function keepAcks(acks, batches) {
+  if (!Array.isArray(acks)) return [];
+  const live = new Set(batches.map(ackKey));
+  return acks.filter((k) => live.has(k));
 }

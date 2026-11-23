@@ -15,6 +15,11 @@ test("drops Herdr's own labels: where and every herdr.*", () => {
   assert.deepEqual(customLabels({ ...app, role: "lead" }), [["role", "lead"]]);
 });
 
+test("hides the harness's own h.* labels from the cards (the label editor keeps them, folded)", () => {
+  assert.deepEqual(customLabels({ task: "PROJ-1", "h.state": "waiting on CI", "h.next": "merge" }), [["task", "PROJ-1"]]);
+  assert.deepEqual(customLabels({ "h.": "x", hx: "y", "h-x": "z" }), [["h-x", "z"], ["hx", "y"]], "only the h. prefix");
+});
+
 test("a key that only starts like herdr is still custom", () => {
   assert.deepEqual(customLabels({ herdrish: "x", "herdr-x": "y" }), [["herdr-x", "y"], ["herdrish", "x"]]);
 });
