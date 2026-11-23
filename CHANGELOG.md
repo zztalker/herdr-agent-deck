@@ -5,6 +5,7 @@ What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 ## 2026-11-23
 
 ### Changed
+- **hc with `hc report`:** the README links to the [zztalker/herdr-core releases](https://github.com/zztalker/herdr-core/releases) page (the newest `*-report.1` build there) instead of one tag, so it no longer needs an edit for each build. No mod code changed.
 - **Harness board, task list numbers:** the numbers in the Task drop-list (All, each task, No task) count only the cards in Needs you and Reviews: what waits on you. Tasks with none still show, with 0. Test: `taskOptions` in `board.test.mjs`.
 
 ### Added

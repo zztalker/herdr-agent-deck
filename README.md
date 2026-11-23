@@ -20,7 +20,7 @@ Ask an agent in Herdr to add `github.com/zztalker/herdr-agent-deck/tree/main/age
 
 **Resume links (macOS, optional):** run `resume-link/install.sh` so a click on a `herdr-resume://` link (Copy link in History, or on a Claude Code card in the Agents column or the Overview) opens that session in Herdr.
 
-**Agent hooks (optional):** two things need the hooks from [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) and an hc with `hc report` ([herdrdev/herdr-core#81](https://github.com/herdrdev/herdr-core/pull/81); until it's released, [herdr-core 0.1.21 + hc report](https://github.com/zztalker/herdr-core/releases/tag/0.1.21-report.1)):
+**Agent hooks (optional):** two things need the hooks from [herdr-agent-waiting-mod](https://github.com/zztalker/herdr-agent-waiting-mod) and an hc with `hc report` ([herdrdev/herdr-core#81](https://github.com/herdrdev/herdr-core/pull/81); until it's released, the newest `*-report.1` build on [zztalker/herdr-core releases](https://github.com/zztalker/herdr-core/releases)):
 
 - **Waiting:** agents at rest whose background shells still run (Claude Code's `run_in_background`) show as Waiting, in the Overview's Working lane.
 - **Cursor:** Cursor Agent CLI reports no status of its own, so without its hook a Cursor pane is a program, not an agent; with it, Cursor is an agent card like any other.
