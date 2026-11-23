@@ -281,3 +281,21 @@ export function repairCut(md) {
   }
   return s;
 }
+
+// The timed refresh is due: `every` seconds since the last load, and nobody is typing an answer
+// or reading the reader (a re-render under it sent its scroll back to the top). It runs on the
+// next tick after they close it.
+export function dueRefresh(s, now) {
+  return Boolean(s.config) && !s.loading && !s.edit && !s.reader && now - (s.loadedAt ?? 0) >= s.config.every * 1000;
+}
+
+// What Esc closes: the innermost thing open, the board itself last. The reader sits over
+// everything; then the Task menu, the Drafts dialog (its edit box first), the answer box, the filter.
+export function escapeStep(s) {
+  if (s.reader) return "reader";
+  if (s.taskMenu) return "taskMenu";
+  if (s.showDrafts) return s.draftEdit ? "draftEdit" : "drafts";
+  if (s.edit) return "edit";
+  if (s.query) return "query";
+  return "close";
+}

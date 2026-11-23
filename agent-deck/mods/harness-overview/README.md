@@ -13,7 +13,7 @@ Name the script in `~/.config/herdr-app/data/harness-overview/config.json`. That
 ```
 
 - `command`: run through `sh -c`, so `~` and `PATH` work. Arguments are added as separate words and never re-read by the shell.
-- `every`: seconds between refreshes while the page is open (default 120, at least 30). It also refreshes after every button and on **Refresh**.
+- `every`: seconds between refreshes while the page is open (default 120, at least 30). It also refreshes after every button and on **Refresh**. The timed refresh waits while you type an answer or read a text in the reader, so your place in it stays put, and runs once you close it.
 - `on` (optional): a machine name from `hc machine ls` to run the command on.
 
 Without the file, or without `command`, the page says the config is absent, shows this format, and runs nothing.
@@ -76,11 +76,13 @@ The filter box matches every word against ids, groups, text, tasks, sessions and
 
 **note** (a draft; in `draft` and on cards): `{ "nid", "qkey", "text", "at" }`, plus for the Drafts dialog's titles `id` or `name` (else `key`), `column` or `where`, `group` and `excerpt` (all optional).
 
+**Esc** closes the innermost thing open: the reader, the Task menu, the Drafts dialog (its edit box first), the answer box, the filter, and only then the board.
+
 **Drafts dialog** (the `Drafts (N)` button): every draft by card, with ✎ (edit), ✕, `Send this card` per card and `Send all`.
 
 ### Reader
 
-"more" opens the whole text in a large window; **Copy** at its top right puts that text (markdown) on the clipboard. A text with no line breaks gets **guess formatting** first (`format.js`): fixed rules, so the same text always comes out the same, and a text that already has line breaks is left as written. In order:
+"more" opens the whole text in a large window; **Copy all** at its top right puts that text (markdown) on the clipboard. To copy a part, select it and press `⌘C` (`Ctrl+C` on Linux and Windows); `⌘A` selects all of it. The text view handles those keys itself: a mod can't read the selection, so a button can't copy it. While the reader is open the cards behind it can't be selected, so a selection holds only the reader's text. A text with no line breaks gets **guess formatting** first (`format.js`): fixed rules, so the same text always comes out the same, and a text that already has line breaks is left as written. In order:
 
 1. a leading `2026-01-21 00:28` time is made bold;
 2. a text opening with a bold header (`**[brief](…)** · **from `vm/t5`** (tab "…"):`) has that header, up to its first `: ` outside quotes and brackets, on its own line;

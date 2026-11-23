@@ -13,10 +13,12 @@
 
 import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, Popup } from "gpui-base";
+import { platform } from "process";
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
-import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut } from "./board.js";
+import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep } from "./board.js";
 import { formatText } from "./format.js";
 
+const MAC = platform === "macos"; // ⌘C on macOS, Ctrl+C elsewhere
 const SHORT = 140; // visible characters of a card's text before "more" (which opens the reader)
 // A text's links and its short cut, kept by text and sessions: render runs on every change.
 const shortText = memo((md, addrs) => {
@@ -42,6 +44,7 @@ export default class HarnessOverview extends View {
     this.busy = null; // the key of the action running
     this.edit = null; // {key, title}: the card whose answer box is open
     this.reader = null; // {title, md}: the text "more" opened
+    this.focus = cx.focus_handle(); // the page's own, so Esc reaches escape() (see render)
     this.showFyi = false;
     this.query = "";
     // null: every task; NO_TASK: cards with none; else that task. The last pick is remembered.
@@ -69,7 +72,7 @@ export default class HarnessOverview extends View {
       }
     });
     cx.timer.every(15000, (cx) => {
-      if (this.config && !this.loading && !this.edit && Date.now() - (this.loadedAt ?? 0) >= this.config.every * 1000) this.load(cx);
+      if (dueRefresh(this, Date.now())) this.load(cx);
     });
   }
 
@@ -121,6 +124,20 @@ export default class HarnessOverview extends View {
       } else notify({ title: "Harness", body: res.error ?? "failed", level: "error", timeout: 8000 });
       this.load(cx);
     });
+  }
+
+  escape(cx) {
+    const step = escapeStep(this);
+    if (step === "close") return this.dismiss();
+    if (step === "reader") this.reader = null;
+    else if (step === "taskMenu") this.taskMenu = false;
+    else if (step === "draftEdit") this.draftEdit = null;
+    else if (step === "drafts") this.showDrafts = false;
+    else if (step === "edit") this.edit = null;
+    else if (step === "query") { this.query = ""; this.input.set_value(""); }
+    // The answer box or filter had the keyboard; give it back to the page so Esc keeps working.
+    this.focus.focus();
+    cx.notify();
   }
 
   dismiss() {
@@ -197,7 +214,9 @@ export default class HarnessOverview extends View {
   body(t, id, md, sessions = [], size = 12, title = "", whole = null) {
     const { full, text, cut } = shortText(md ?? "", sessions.map((s) => s.address).join("\n"));
     return v_flex().id(`${id}-body`).w_full().min_w(0).text_size(size).text_color(t.foreground)
-      .child(TextView.markdown(`${id}-md`, text).selectable(true).w_full()
+      // Not while the reader is open: a selection spans every selectable text under the drag,
+      // so a drag in the reader also picked up the cards behind it.
+      .child(TextView.markdown(`${id}-md`, text).selectable(!this.reader).w_full()
         .on_link_click((url, _cx) => this.openLink(url)))
       .when(cut, (el) => el.child(div().id(`${id}-more`).text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.text_color(t.foreground))
         .tooltip("Read it all")
@@ -213,13 +232,15 @@ export default class HarnessOverview extends View {
       .on_click((_e, cx) => cx.stop_propagation())
       .child(h_flex().h(44).flex_none().px(16).gap(10).items_center().border_b(1).border_color(t.border)
         .child(div().flex_1().min_w(0).truncate().text_size(14).font_semibold().text_color(t.foreground).child(r.title || "Text"))
-        // Copy: the text as shown here (markdown, links and all) to the clipboard.
-        .child(this.btn(t, "rd-copy", r.copied ? "Copied" : "Copy", (cx) => {
+        // Copy: the text as shown here (markdown, links and all) to the clipboard. A part: select it
+        // and press ⌘C (Ctrl+C), which the text view handles itself; a mod can't read the selection.
+        .child(div().flex_none().text_size(11).text_color(t.dim).child(`Select a part + ${MAC ? "⌘C" : "Ctrl+C"} to copy it`))
+        .child(this.btn(t, "rd-copy", r.copied ? "Copied" : "Copy all", (cx) => {
           cx.write_to_clipboard(r.md);
           r.copied = true;
           cx.notify();
           cx.timer.after(2000, (cx) => { if (this.reader === r) { r.copied = false; cx.notify(); } });
-        }, { tip: "Copy this text (markdown) to the clipboard" }))
+        }, { tip: "Copy the whole text (markdown) to the clipboard. For a part, select it and press ⌘C / Ctrl+C" }))
         .child(div().id("rd-close").p(4).rounded(4).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
           .tooltip("Close (Esc)").on_click((_e, cx) => close(cx)).child(svg("mods/workspace-chrome/x.svg").size(14))))
       .child(v_flex().id("rd-body").flex_1().min_h(0).px(24).py(16).overflow_y_scrollbar().text_size(14).text_color(t.foreground)
@@ -498,14 +519,14 @@ export default class HarnessOverview extends View {
         .tooltip("Close (Esc)").on_click(() => this.dismiss()).child(svg("mods/workspace-chrome/x.svg").size(14)));
 
     const root = v_flex().relative().size_full().min_h(0).bg(t.background ?? t.chrome)
+      // Esc in a dialog overlay is Herdr's `overlay.close`, a key binding that runs before key
+      // handlers, so the page takes that action itself and closes the innermost thing first.
+      // Tracking its own focus keeps the keyboard inside the page after a click on it.
+      .track_focus(this.focus)
+      .on_action("overlay.close", (_e, cx) => this.escape(cx))
       .on_key_down((e, cx) => {
         if (e.key !== "escape") return;
-        if (this.reader) { this.reader = null; cx.notify(); }
-        else if (this.taskMenu) { this.taskMenu = false; cx.notify(); }
-        else if (this.showDrafts) { if (this.draftEdit) this.draftEdit = null; else this.showDrafts = false; cx.notify(); }
-        else if (this.edit) { this.edit = null; cx.notify(); }
-        else if (this.query) { this.query = ""; this.input.set_value(""); cx.notify(); }
-        else this.dismiss();
+        this.escape(cx);
         cx.stop_propagation();
       })
       .child(header);

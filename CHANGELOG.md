@@ -2,6 +2,13 @@
 
 What changed in `agent-deck`, newest first. Dates are when it landed on `main`.
 
+## 2026-11-23
+
+### Fixed
+- **Harness board, reader keeps your place:** the timed refresh no longer sends a long text in the reader back to its top. It waits while the reader is open, as it already did while you typed an answer, and runs once you close it. Test: `dueRefresh` in `board.test.mjs`.
+- **Harness board, copy a part of the reader:** the reader says how: select the part and press `⌘C` (`Ctrl+C`); the button is now **Copy all**. A selection in the reader no longer picks up text from the cards behind it: they can't be selected while it is open.
+- **Harness board, Esc:** Esc closes the reader (then the Task menu, the Drafts dialog, the answer box, the filter) before the board. Herdr's Esc in a dialog overlay is `overlay.close`, a key binding that ran before the page's own key handler and closed the whole board; the page now takes that action itself and keeps the keyboard focus after a click on it. Test: `escapeStep` in `board.test.mjs`.
+
 ## 2026-11-21
 
 ### Changed

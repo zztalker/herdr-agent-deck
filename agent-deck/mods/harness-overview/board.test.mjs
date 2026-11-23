@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -327,4 +327,32 @@ test("repairCut: a link cut off in the middle shows its text and …; whole link
   assert.equal(repairCut("ok [a](https://x.io) done"), "ok [a](https://x.io) done");
   assert.equal(repairCut("code `not closed"), "code not closed");
   assert.equal(repairCut(""), "");
+});
+
+// --- refresh ---------------------------------------------------------------------------
+
+test("the timed refresh waits while you type an answer or read the reader", () => {
+  const s = { config: { every: 120 }, loading: false, edit: null, reader: null, loadedAt: 0 };
+  const now = 121_000;
+  assert.equal(dueRefresh(s, now), true);
+  assert.equal(dueRefresh({ ...s, loadedAt: 10_000 }, now), false, "not yet `every` seconds");
+  assert.equal(dueRefresh({ ...s, config: null }, now), false, "no config");
+  assert.equal(dueRefresh({ ...s, loading: true }, now), false, "already loading");
+  assert.equal(dueRefresh({ ...s, edit: { key: "k" } }, now), false, "typing an answer");
+  // A re-render under the reader sent its scroll back to the top.
+  assert.equal(dueRefresh({ ...s, reader: { title: "t", md: "long" } }, now), false, "reading");
+});
+
+// --- Esc -------------------------------------------------------------------------------
+
+test("Esc closes the innermost thing first, the board last", () => {
+  const none = { reader: null, taskMenu: false, showDrafts: false, draftEdit: null, edit: null, query: "" };
+  assert.equal(escapeStep(none), "close");
+  assert.equal(escapeStep({ ...none, query: "x" }), "query");
+  assert.equal(escapeStep({ ...none, query: "x", edit: { key: "k" } }), "edit");
+  assert.equal(escapeStep({ ...none, edit: { key: "k" }, showDrafts: true }), "drafts");
+  assert.equal(escapeStep({ ...none, showDrafts: true, draftEdit: "n1" }), "draftEdit");
+  assert.equal(escapeStep({ ...none, showDrafts: true, taskMenu: true }), "taskMenu");
+  // The reader sits over everything, the Drafts dialog included.
+  assert.equal(escapeStep({ ...none, reader: { md: "x" }, showDrafts: true, edit: { key: "k" }, query: "x" }), "reader");
 });
