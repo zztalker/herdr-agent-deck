@@ -208,6 +208,8 @@ export function knownSessions(data) {
 // The KEY the Ask button passes for a task card (its own `key` if the script gives one) and for a
 // blocked session; the script turns it into a question with that task's / session's context.
 export const taskKey = (x) => x.key ?? `task|${x.task}`;
+// A task card's name: its subtask `id` when the script gives one (several cards per task), else its task.
+export const taskLabel = (x) => x.id ?? x.task;
 export const sessionKey = (b) => `session|${b.address}`;
 export const notesFor = (draft, key) => (draft ?? []).filter((n) => n.qkey === key);
 

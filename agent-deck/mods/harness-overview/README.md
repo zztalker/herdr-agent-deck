@@ -68,7 +68,7 @@ A Needs-you or Reviews card with a `question` status (you already asked or answe
 | `question` | Status of a question you sent about it: `waiting`, `answered`, `ok-sent`, `accepted`. |
 | `draft` | Your saved notes on it: `[{ "nid": "…", "text": "…" }]`, each with ✕. |
 
-**task** (In progress; `Waiting on you` first, `Closed` left out): `task`, `title`, `state`, `column` (`Active`, `Waiting on you`, `Closed`), `sessions` (as on cards), `last` (latest log line).
+**task** (In progress; `Waiting on you` first, `Closed` left out): `task`, `title`, `state`, `column` (`Active`, `Waiting on you`, `Closed`), `sessions` (as on cards), `last` (latest log line). Optional: `id` (a subtask's id: the card is named by it, so a task can have several cards, one per subtask; the Task filter still goes by `task`) and `key` (what its **Ask** button passes as `KEY`).
 
 **batch** (Questions; `answered` first with **ACK** and **OK** buttons, then `waiting` and `ok-sent`; `accepted` left out): `sent` (its id), `status`, `entries`: `[{ "key", "name", "where", "quote", "questions": [text], "answers": [{ "head", "body" }], "draft": [note] }]`. Each entry shows its `name` as its title (a URL reads as `app!183` and opens on click), an `asked from <where>` chip, its `quote` (the item as it read when asked; sessions any card names are links there), then the questions and answers. An entry with answers has **Ask more**, which uses its `key` as `KEY`. **Thread** (and "more" on its quote, questions or answers) opens the whole thread in the reader: every entry with the same `name` across the batches, oldest first, under what it was asked from and about.
 
@@ -88,7 +88,7 @@ The filter box matches every word against ids, groups, text, tasks, sessions and
 
 ### Reader
 
-"more" opens the whole text in a large window; **Copy all** at its top right puts that text (markdown) on the clipboard. To copy a part, select it and press `⌘C` (`Ctrl+C` on Linux and Windows); `⌘A` selects all of it. The text view handles those keys itself: a mod can't read the selection, so a button can't copy it. While the reader is open the cards behind it can't be selected, so a selection holds only the reader's text. A text with no line breaks gets **guess formatting** first (`format.js`): fixed rules, so the same text always comes out the same, and a text that already has line breaks is left as written. In order:
+"more" opens the whole text in a large window; **Copy all** at its top right puts that text (markdown) on the clipboard. To copy a part, select it and press `⌘C` (`Ctrl+C` on Linux and Windows); `⌘A` selects all of it. The text view handles those keys itself: a mod can't read the selection, so a button can't copy it. While the reader is open the cards behind it can't be selected, so a selection holds only the reader's text. Each paragraph of a text (paragraphs are separated by blank lines) gets **guess formatting** first (`format.js`): fixed rules, so the same text always comes out the same, and a paragraph that already has line breaks is left as written. In order:
 
 1. a leading `2026-01-21 00:28` time is made bold;
 2. a text opening with a bold header (`**[brief](…)** · **from `vm/t5`** (tab "…"):`) has that header, up to its first `: ` outside quotes and brackets, on its own line;

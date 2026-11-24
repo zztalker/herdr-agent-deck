@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, taskLabel, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -414,4 +414,9 @@ test("stored ACKs keep only batches still on the board", () => {
   const b1 = answeredBatch("s1", 1);
   assert.deepEqual(keepAcks([ackKey(b1), "gone|1", ackKey(answeredBatch("s1", 3))], [b1]), [ackKey(b1)]);
   assert.deepEqual(keepAcks("nope", [b1]), [], "a stored value it can't read");
+});
+
+test("a task card is named by its subtask id when it has one, else by its task", () => {
+  assert.equal(taskLabel({ task: "release", id: "RL-3" }), "RL-3");
+  assert.equal(taskLabel({ task: "infra" }), "infra");
 });

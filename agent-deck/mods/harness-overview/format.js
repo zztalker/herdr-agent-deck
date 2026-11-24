@@ -1,6 +1,7 @@
 // harness-overview: "guess formatting" for the reader. Dense one-line texts (queue items, task log
 // lines, a session's notes, dialog questions) get paragraphs and lists by fixed rules, so the same
-// text always comes out the same. Text that already has line breaks is left alone. No imports, so
+// text always comes out the same. A text of several paragraphs (blank lines between them) is shaped
+// one paragraph at a time; a paragraph that already has line breaks is left alone. No imports, so
 // node can test it (format.test.mjs).
 //
 // Rules, in order:
@@ -84,7 +85,12 @@ function split(p, size) {
 
 export function formatText(md) {
   const src = md ?? "";
-  if (!src || src.includes("\n")) return src;
+  if (src.includes("\n")) return src.split(/\n{2,}/).map((p) => (p.includes("\n") ? p : formatParagraph(p))).join("\n\n");
+  return formatParagraph(src);
+}
+
+function formatParagraph(src) {
+  if (!src) return src;
   const { text, restore } = protect(src);
   const size = (s) => restore(s).length;
   const bold = text.startsWith("**"); // rule 2 is for texts that open with a bold header, not a bolded time

@@ -15,7 +15,7 @@ import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, Popup } from "gpui-base";
 import { platform } from "process";
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
-import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks } from "./board.js";
+import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, taskLabel, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks } from "./board.js";
 import { formatText } from "./format.js";
 
 const MAC = platform === "macos"; // ⌘C on macOS, Ctrl+C elsewhere
@@ -328,17 +328,17 @@ export default class HarnessOverview extends View {
   }
 
   taskCard(t, x) {
-    const id = `tk-${x.task}`;
+    const id = `tk-${taskLabel(x)}`;
     const waiting = x.column === "Waiting on you";
     return v_flex().id(id).flex_none().w_full().px(10).py(8).gap(5).rounded(8).bg(t.surface).border(1).border_color(waiting ? t.blocked : t.border)
       .child(h_flex().gap(6).items_center().min_w(0)
-        .child(div().flex_none().font_semibold().text_size(12).text_color(t.foreground).child(x.task))
+        .child(div().flex_none().font_semibold().text_size(12).text_color(t.foreground).child(taskLabel(x)))
         .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(x.title ?? ""))
         .when(waiting, (el) => el.child(this.chip(t, `${id}-w`, "waiting on you", t.blocked))))
-      .child(this.body(t, `${id}-state`, x.state, x.sessions, 11.5, x.task))
-      .when(Boolean(x.last), (el) => el.child(this.body(t, `${id}-last`, `last: ${x.last}`, x.sessions, 12, `${x.task} · last`)))
+      .child(this.body(t, `${id}-state`, x.state, x.sessions, 11.5, taskLabel(x)))
+      .when(Boolean(x.last), (el) => el.child(this.body(t, `${id}-last`, `last: ${x.last}`, x.sessions, 12, `${taskLabel(x)} · last`)))
       .when(x.sessions.length > 0, (el) => el.child(h_flex().flex_wrap().gap(4).children(x.sessions.map((s) => this.sessionChip(t, `${id}-s-${s.address}`, s)))))
-      .child(this.askRow(t, id, taskKey(x), "Ask", x.task));
+      .child(this.askRow(t, id, taskKey(x), "Ask", taskLabel(x)));
   }
 
   // A card's title: a link reads as people name it (app!183) and opens on click; the full name on hover.

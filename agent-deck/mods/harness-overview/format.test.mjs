@@ -3,11 +3,23 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { formatText } from "./format.js";
 
-test("text that already has line breaks is left as it is", () => {
+test("a paragraph whose lines are already broken is left as it is", () => {
   const md = "**Head:**\n- one\n- two";
   assert.equal(formatText(md), md);
   assert.equal(formatText(""), "");
   assert.equal(formatText(null), "");
+});
+
+test("each one-line paragraph of a longer text is shaped on its own", () => {
+  const long = "Rebased on main, pipeline 813882 green, approval gate passed (13:09), mergeable, 0 threads. ".repeat(6).trim();
+  const md = `**2026-01-24 14:23 UTC · review**\n\nMerged by you. Was: draft. Then more.\n\n---\n\n**2026-01-24 13:33 UTC · review**\n\n${long}\n\n**Head:**\n- one\n- two`;
+  const out = formatText(md).split("\n\n");
+  assert.equal(out[0], "**2026-01-24 14:23 UTC · review**");
+  assert.deepEqual(out.slice(1, 3), ["Merged by you.", "Was: draft. Then more."]);  // rule 6 inside the paragraph
+  assert.equal(out[3], "---");
+  assert.equal(out[4], "**2026-01-24 13:33 UTC · review**");
+  assert.ok(out.slice(5, -1).length >= 2, "the long paragraph is split at sentence ends");
+  assert.equal(out.at(-1), "**Head:**\n- one\n- two");
 });
 
 test("a leading bold header up to its first ': ' gets its own line", () => {
