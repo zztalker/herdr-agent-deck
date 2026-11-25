@@ -52,7 +52,7 @@ Only `ok` is required; a missing part shows as empty. `manager` and `commit` are
 | `FYI` | **In progress**, behind the FYI toggle |
 | anything else | not shown |
 
-A Needs-you or Reviews card with a `question` status (you already asked or answered about it) waits on the harness, not on you: it shows under **In progress**, "Asked or answered by you, waiting on the harness", until the script drops it or clears its status.
+A Needs-you or Reviews card with a `question` status other than `answered` (you asked about it, or sent your OK) waits on the harness, not on you: it shows under **In progress**, "Asked or answered by you, waiting on the harness", until the script drops it or changes its status. An `answered` card stays in its column: the answer is yours to read.
 
 **card:**
 
@@ -66,6 +66,7 @@ A Needs-you or Reviews card with a `question` status (you already asked or answe
 | `sessions` | `[{ "address": "vm/t2", "status": "blocked" }]`: chips colored by status; a running one (status set) is a button that goes to that session. |
 | `links` | URLs, opened in the browser; shown as chips only when the text doesn't already contain them. |
 | `question` | Status of a question you sent about it: `waiting`, `answered`, `ok-sent`, `accepted`. |
+| `ok` | Optional: with `question` `answered`, an **OK** button (on the card and in its reader) that runs `ok <ok>`. |
 | `draft` | Your saved notes on it: `[{ "nid": "…", "text": "…" }]`, each with ✕. |
 
 **task** (In progress; `Waiting on you` first, `Closed` left out): `task`, `title`, `state`, `column` (`Active`, `Waiting on you`, `Closed`), `sessions` (as on cards), `last` (latest log line). Optional: `id` (a subtask's id: the card is named by it, so a task can have several cards, one per subtask; the Task filter still goes by `task`) and `key` (what its **Ask** button passes as `KEY`).

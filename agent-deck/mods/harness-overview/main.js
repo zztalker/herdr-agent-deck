@@ -325,7 +325,11 @@ export default class HarnessOverview extends View {
     const id = `it-${i.qkey}`;
     const editing = this.editingOnCard(i.qkey);
     const head = cardTitle(i);
-    const acts = { ask: { key: i.qkey, label: "Answer", title: head } };
+    // OK on a card that holds an answered thread (the script folds it in and gives its batch as `ok`).
+    const okBtn = (t, pre, done = () => {}) => (i.ok && qs === "answered" ? [this.btn(t, `${pre}-ok`, this.busy === `ok-${i.ok}` ? "…" : "OK", (cx) => {
+      this.act(`ok-${i.ok}`, ["ok", i.ok], cx, () => "Answer accepted"); done(cx);
+    }, { primary: true, disabled: Boolean(this.busy), tip: "Tell the manager the answer is OK" })] : []);
+    const acts = { ask: { key: i.qkey, label: "Answer", title: head }, extra: (t) => okBtn(t, "rd-it", (cx) => { this.closeReader(); cx.notify(); }) };
     const qs = i.question;
     const extra = (i.links ?? []).filter((u) => !(i.text ?? "").includes(u));
     return v_flex().id(id).flex_none().w_full().px(10).py(8).gap(5).rounded(8).bg(t.surface)
@@ -348,7 +352,8 @@ export default class HarnessOverview extends View {
         .children(extra.slice(0, 4).map((u, k) => this.linkChip(t, `${id}-l-${k}`, u)))))
       .when(i.draft.length > 0, (el) => el.child(this.drafts(t, id, i.draft)))
       .child(editing ? this.editor(t, i.qkey, i.draft.length > 0)
-        : h_flex().gap(6).child(this.btn(t, `${id}-ans`, i.draft.length ? "Answer / send drafts" : "Answer", (cx) => this.openEditor(i.qkey, head, cx), { disabled: Boolean(this.busy) })));
+        : h_flex().gap(6).child(this.btn(t, `${id}-ans`, i.draft.length ? "Answer / send drafts" : "Answer", (cx) => this.openEditor(i.qkey, head, cx), { disabled: Boolean(this.busy) }))
+          .child(div().flex_1()).children(okBtn(t, id)));
   }
 
   // Saved drafts under `key`, then the answer box or the button that opens it (Ask / Answer…).

@@ -71,7 +71,7 @@ test("needs you: urgent first, then decisions; reviews: ready to merge, then on 
   assert.deepEqual(c.fyi.map((i) => i.id), ["F1"]);
 });
 
-test("a Needs-you or Reviews card you already asked or answered about moves to In progress (asked)", () => {
+test("a Needs-you or Reviews card waiting on the harness (asked, or OK sent) moves to In progress; an answered one stays, yours to read", () => {
   const data = { sections: [
     { column: "Urgent", items: [item("Urgent", "U1"), item("Urgent", "U2", { question: "waiting" })] },
     { column: "Decide", items: [item("Decide", "D1", { question: "answered" }), item("Decide", "D2"), item("Decide", "D3", { question: "ok-sent" }), item("Decide", "D4", { question: "accepted" })] },
@@ -79,10 +79,10 @@ test("a Needs-you or Reviews card you already asked or answered about moves to I
     { column: "On review", items: [item("On review", "R1", { question: "waiting" }), item("On review", "R2")] },
   ] };
   const c = columns(data);
-  assert.deepEqual(c.needs.map((i) => i.id), ["U1", "D2"]);
-  assert.deepEqual(c.reviews.map((i) => i.id), ["R2"]);
-  assert.deepEqual(c.asked.map((i) => i.id), ["U2", "D1", "D3", "D4", "M1", "R1"], "Needs you first, then Reviews");
-  assert.deepEqual(columns(data, (x) => x.id === "D1").asked.map((i) => i.id), ["D1"], "the filter applies");
+  assert.deepEqual(c.needs.map((i) => i.id), ["U1", "D1", "D2"]);
+  assert.deepEqual(c.reviews.map((i) => i.id), ["M1", "R2"]);
+  assert.deepEqual(c.asked.map((i) => i.id), ["U2", "D3", "D4", "R1"], "Needs you first, then Reviews");
+  assert.deepEqual(columns(data, (x) => x.id === "D3").asked.map((i) => i.id), ["D3"], "the filter applies");
 });
 
 test("in progress: tasks waiting on you first, closed ones left out; blocked sessions kept", () => {
@@ -173,8 +173,8 @@ test("taskOptions: every task once, sorted, counting its cards in Needs you + Re
     { column: "On review", items: [item("On review", "R1", { tasks: ["c"] }), item("On review", "R2", { tasks: ["c"], question: "waiting" })] },
     { column: "FYI", items: [item("FYI", "F1", { tasks: ["a"] })] },
     { column: "Urgent", items: [item("Urgent", "U1", { tasks: ["b"], question: "answered" })] }] };
-  // R1 counts; R2 and U1 (asked: In progress) and F1 (FYI) don't, but their tasks are listed.
-  assert.deepEqual(taskOptions(more), { tasks: [["a", 1], ["b", 1], ["c", 1]], none: 1, all: 3 });
+  // R1 and U1 (answered: yours to read) count; R2 (asked: In progress) and F1 (FYI) don't, but their tasks are listed.
+  assert.deepEqual(taskOptions(more), { tasks: [["a", 1], ["b", 2], ["c", 1]], none: 1, all: 4 });
   assert.deepEqual(taskOptions({}), { tasks: [], none: 0, all: 0 });
 });
 

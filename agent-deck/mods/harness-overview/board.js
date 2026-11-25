@@ -38,14 +38,16 @@ export function columns(data, keep = () => true) {
   const tasks = (data?.tasks ?? []).filter((t) => t.column in TASK_ORDER).filter(keep)
     .sort((a, b) => TASK_ORDER[a.column] - TASK_ORDER[b.column]);
   const batches = (data?.batches ?? []).filter(keep);
-  // A Needs-you or Reviews card you already asked or answered about waits on the harness, not on
-  // you, until the manager takes it off its list: it shows under In progress ("asked") instead.
+  // A Needs-you or Reviews card you asked about (or sent your OK on) waits on the harness, not on
+  // you, until the manager answers or takes it off its list: it shows under In progress ("asked").
+  // An answered one stays where it is: the answer is yours to read, Answer again or OK.
   const needs = items(NEEDS);
   const reviews = items(REVIEWS);
+  const waits = (i) => Boolean(i.question) && i.question !== "answered";
   return {
-    needs: needs.filter((i) => !i.question),
-    asked: [...needs, ...reviews].filter((i) => i.question),
-    reviews: reviews.filter((i) => !i.question),
+    needs: needs.filter((i) => !waits(i)),
+    asked: [...needs, ...reviews].filter(waits),
+    reviews: reviews.filter((i) => !waits(i)),
     fyi: items(["FYI"]),
     tasks,
     blocked: data?.blocked ?? [],
