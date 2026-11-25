@@ -68,3 +68,38 @@ test("long text is split into paragraphs at sentence ends, never inside links or
 test("short text without any pattern is unchanged", () => {
   assert.equal(formatText("All green. Merge when ready."), "All green. Merge when ready.");
 });
+
+test("a decision with quoted replies: capitals header, quotes as blockquotes, options as a list ending at its sentence", () => {
+  const src = "DECISION (OK to post): t4 fixed both review threads on app!12 in commit abc123, test first. Nothing posted yet. "
+    + "Thread 1 (app!12), \"Restart\" placeholders: \"You're right, thanks. Fixed in abc123: restarted runs skip placeholders now. A new test covers both cases.\" "
+    + "Thread 2 (app!12), failed arches: \"Agreed, fixed here in abc123. A failed target now ends its line (e.g. 'x86 passed; arm FAILED'). Three new tests.\" "
+    + "Suggested addition: \"The MR comes from a fork, so its pipeline can't start here; could you run it?\" (the earlier question, option 1). "
+    + "Options: 1) post both plus the pipeline line (recommended); 2) post without it; 3) change the text: tell me what. "
+    + "Threads stay unresolved for the reviewer. · from t4 (review).";
+  assert.equal(formatText(src), [
+    "**DECISION (OK to post):**",
+    "t4 fixed both review threads on app!12 in commit abc123, test first. Nothing posted yet.",
+    "Thread 1 (app!12), \"Restart\" placeholders:",
+    "> You're right, thanks. Fixed in abc123: restarted runs skip placeholders now. A new test covers both cases.",
+    "Thread 2 (app!12), failed arches:",
+    "> Agreed, fixed here in abc123. A failed target now ends its line (e.g. 'x86 passed; arm FAILED'). Three new tests.",
+    "Suggested addition:",
+    "> The MR comes from a fork, so its pipeline can't start here; could you run it?",
+    "(the earlier question, option 1).",
+    "Options:",
+    "1. post both plus the pipeline line (recommended)\n2. post without it\n3. change the text: tell me what",
+    "Threads stay unresolved for the reviewer.",
+    "· from t4 (review).",
+  ].join("\n\n"));
+});
+
+test("a short quote after a colon stays inline; a capitals word that isn't a label stays as it is", () => {
+  assert.equal(formatText('It says: "ok then". Fine.'), 'It says: "ok then". Fine.');
+  assert.equal(formatText("NOTE this one has no colon"), "NOTE this one has no colon");
+});
+
+test("a second options list after the first one's tail is a list too; a short OK: is no header", () => {
+  const out = formatText("Options: 1) merge now; 2) wait. Since then it changed. Options: 1) merge on green; 2) more changes. Done.");
+  assert.equal(out, "Options:\n\n1. merge now\n2. wait\n\nSince then it changed.\n\nOptions:\n\n1. merge on green\n2. more changes\n\nDone.");
+  assert.equal(formatText("OK: your answer of 2026-11-25 12:56 UTC is accepted."), "OK: your answer of 2026-11-25 12:56 UTC is accepted.");
+});

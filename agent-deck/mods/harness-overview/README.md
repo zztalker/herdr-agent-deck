@@ -92,12 +92,13 @@ The filter box matches every word against ids, groups, text, tasks, sessions and
 "more" opens the whole text in a large window. Its foot has the card's buttons, so you can act while you read: **Answer** (a queue card), **Ask** (a task or blocked session), **Ask more**, **ACK** / **Un-ACK** and **OK** (a question). The answer box opens there too; Esc closes it before the reader, and closing the reader moves an unsent answer to its card. ACK, Un-ACK and OK close the reader, since the question moves. **Copy all** at its top right puts that text (markdown) on the clipboard. To copy a part, select it and press `⌘C` (`Ctrl+C` on Linux and Windows); `⌘A` selects all of it. The text view handles those keys itself: a mod can't read the selection, so a button can't copy it. While the reader is open the cards behind it can't be selected, so a selection holds only the reader's text. Each paragraph of a text (paragraphs are separated by blank lines) gets **guess formatting** first (`format.js`): fixed rules, so the same text always comes out the same, and a paragraph that already has line breaks is left as written. In order:
 
 1. a leading `2026-01-21 00:28` time is made bold;
-2. a text opening with a bold header (`**[brief](…)** · **from `vm/t5`** (tab "…"):`) has that header, up to its first `: ` outside quotes and brackets, on its own line;
-3. ` — **2026-…` (a dated update) starts a paragraph;
-4. options at the end, `(A (Recommended) · B)`, become a bullet list;
-5. inline steps `1) … → 2) … → 3) …` become a numbered list;
-6. a label after a sentence (`Was: …`, `Report: …`, `**P1 order:** …`) starts a paragraph;
-7. a paragraph still over 400 characters is split at sentence ends into paragraphs of about 300 (not after `e.g.`, `i.e.`, `etc.`).
+2. a text opening with a bold header (`**[brief](…)** · **from `vm/t5`** (tab "…"):`) has that header, up to its first `: ` outside quotes and brackets, on its own line; so does an opening label in capitals (`DECISION (OK to post): …`, three letters or more, so `OK:` stays), made bold;
+3. ` — **2026-…` (a dated update) starts a paragraph, and so does a closing ` · from …`;
+4. a long quote right after `: ` (`Thread 1 …: "You're right, …"`, 60 characters or more) becomes a blockquote, with its lead-in, from the sentence it starts in, on a line of its own;
+5. options at the end, `(A (Recommended) · B)`, become a bullet list;
+6. inline steps or options, `1) … → 2) …` or `1) …; 2) …`, become a numbered list that ends with its last item's first sentence (what follows is a paragraph again, and may hold another list); an item's closing `;` goes;
+7. a label after a sentence (`Was: …`, `Report: …`, `Options:`, `**P1 order:** …`) starts a paragraph;
+8. a paragraph still over 400 characters is split at sentence ends into paragraphs of about 300 (not after `e.g.`, `i.e.`, `etc.`). Blockquotes are left whole.
 
 Links, autolinks and code spans are never split or changed.
 
