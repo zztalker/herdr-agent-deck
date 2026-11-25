@@ -6,7 +6,7 @@ import { View, div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Popup } from "gpui-base";
 import { spaces, agents, terminals, panes, run, hc, theme, props, closeOverlay, openOverlay, settings, nextCommand } from "herdr";
 import { parseUsage, usageArgs } from "./usage.js";
-import { customLabels, taskMatches, taskCounts, NO_TASK, saveTaskFilter, loadTaskFilter } from "./labels.js";
+import { customLabels, taskMatches, taskCounts, NO_TASK, saveTaskFilter, loadTaskFilter, menuHeight, MENU_ROW } from "./labels.js";
 import { SESSION_OF, sessionFrom, resumeLink, machineOf as machineOfAddress } from "./resume.js";
 
 // agent-deck: edit a terminal's labels in the agent-deck-labels dialog.
@@ -254,13 +254,14 @@ export default class Overview extends View {
       .child(div().flex_none().text_color(t.dim).child("Task"))
       .child(div().min_w(0).truncate().text_color(t.foreground).child(text))
       .child(svg("mods/workspace-chrome/chevron-down.svg").size(12).flex_none().text_color(t.dim));
-    const option = (id, value, label, n) => h_flex().id(`ov-task-opt-${id}`).px(8).py(4).gap(8).items_center().rounded(5).cursor_pointer()
+    const option = (id, value, label, n) => h_flex().id(`ov-task-opt-${id}`).flex_none().h(MENU_ROW).px(8).gap(8).items_center().rounded(5).cursor_pointer()
       .when(f === value, (el) => el.bg(t.selected))
       .hover((s) => s.bg(t.hover))
       .on_click((_e, cx) => { cx.stop_propagation(); this.setTaskFilter(value, cx); })
       .child(div().flex_1().min_w(0).truncate().text_color(value === NO_TASK || value === null ? t.dim : t.foreground).child(label))
       .child(div().flex_none().text_color(t.dim).child(String(n)));
-    const menu = v_flex().id("ov-task-list").w(280).max_h(360).overflow_y_scrollbar().p(4).gap(1).rounded(8).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg().text_size(12)
+    const rows = tasks.length + 2;
+    const menu = v_flex().id("ov-task-list").w(280).h(menuHeight(rows)).overflow_y_scrollbar().p(4).gap(1).rounded(8).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg().text_size(12)
       .child(option("all", null, "All tasks", population.length))
       .children(tasks.map(([k, n], i) => option(i, k, k, n)))
       .child(option("none", NO_TASK, "No task", none));

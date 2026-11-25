@@ -51,3 +51,11 @@ export function loadTaskFilter(stored) {
     return null;
   }
 }
+
+// The Task menu's height: its rows' own (MENU_ROW each, 1 px apart, 4 px padding, 1 px border),
+// up to `cap`; past that the list scrolls. A scroll area needs a definite height: with only a
+// max height its rows shrank to fit and the list never scrolled, so the last tasks were cut off.
+export const MENU_ROW = 26;
+export function menuHeight(rows, cap = 480) {
+  return Math.min(rows * MENU_ROW + Math.max(rows - 1, 0) + 8 + 2, cap);
+}

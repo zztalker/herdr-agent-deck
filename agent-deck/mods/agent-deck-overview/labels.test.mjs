@@ -1,7 +1,7 @@
 // node --test labels.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { customLabels, taskOf, taskMatches, taskCounts, NO_TASK, saveTaskFilter, loadTaskFilter } from "./labels.js";
+import { customLabels, taskOf, taskMatches, taskCounts, NO_TASK, saveTaskFilter, loadTaskFilter, menuHeight } from "./labels.js";
 
 // --- customLabels (chips) ------------------------------------------------------------
 
@@ -74,4 +74,11 @@ test("task filter round-trips through storage: all, no task, a task", () => {
 
 test("loadTaskFilter: nothing stored, junk or a wrong type means all tasks", () => {
   for (const s of [null, undefined, "", "not json", "42", "{}", "[]", '""']) assert.equal(loadTaskFilter(s), null, String(s));
+});
+
+test("menuHeight: the rows' own height, up to the cap; the rest scrolls", () => {
+  assert.equal(menuHeight(3), 3 * 26 + 2 * 1 + 8 + 2, "3 rows of 26, 2 gaps, padding and border");
+  assert.equal(menuHeight(1), 26 + 10);
+  assert.equal(menuHeight(40), 480, "many tasks: capped, scrolls");
+  assert.equal(menuHeight(40, 300), 300);
 });

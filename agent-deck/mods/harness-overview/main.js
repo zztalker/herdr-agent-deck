@@ -15,7 +15,7 @@ import { View, div, svg } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, TextareaState, Textarea, TextView, Popup } from "gpui-base";
 import { platform } from "process";
 import { exec, run, agents, theme, props, closeOverlay, notify, appHome, readTextFile, checking, nextCommand, window as win } from "herdr";
-import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, taskLabel, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks } from "./board.js";
+import { CONFIG_PATH, parseConfig, shellArgs, plain, columns, matches, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, taskLabel, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks, entryPreview, menuHeight, MENU_ROW } from "./board.js";
 import { formatText } from "./format.js";
 
 const MAC = platform === "macos"; // ⌘C on macOS, Ctrl+C elsewhere
@@ -42,8 +42,8 @@ export default class HarnessOverview extends View {
     this.error = null;
     this.loading = false;
     this.busy = null; // the key of the action running
-    this.edit = null; // {key, title}: the card whose answer box is open
-    this.reader = null; // {title, md}: the text "more" opened
+    this.edit = null; // {key, title, inReader}: the card whose answer box is open (inReader: in the reader, not on the card)
+    this.reader = null; // {title, md, acts}: the text "more" opened; acts: its card's buttons (see readerActs)
     this.focus = cx.focus_handle(); // the page's own, so Esc reaches escape() (see render)
     this.showFyi = false;
     // ACKed answers (ackKey): read, nothing to send; behind the ACKs toggle. This page only.
@@ -136,7 +136,7 @@ export default class HarnessOverview extends View {
   escape(cx) {
     const step = escapeStep(this);
     if (step === "close") return this.dismiss();
-    if (step === "reader") this.reader = null;
+    if (step === "reader") this.closeReader();
     else if (step === "message") this.message = null;
     else if (step === "taskMenu") this.taskMenu = false;
     else if (step === "draftEdit") this.draftEdit = null;
@@ -153,8 +153,8 @@ export default class HarnessOverview extends View {
     if (id) closeOverlay(id);
   }
 
-  openEditor(key, title, cx) {
-    this.edit = this.edit?.key === key ? null : { key, title };
+  openEditor(key, title, cx, inReader = false) {
+    this.edit = this.edit?.key === key && Boolean(this.edit.inReader) === inReader ? null : { key, title, inReader };
     this.answer.set_value("");
     if (this.edit) this.answer.focus();
     cx.notify();
@@ -219,23 +219,55 @@ export default class HarnessOverview extends View {
   // stay small; "more" opens it whole in the reader window.
   // `whole`: a function giving the markdown the reader shows instead (a question's whole thread);
   // it runs only on click, so render never pays for it.
-  body(t, id, md, sessions = [], size = 12, title = "", whole = null) {
+  // `acts`: the card's buttons, shown in the reader too (see readerActs). `always`: show "more" even
+  // when the text isn't cut (a question card's preview: the thread holds more).
+  body(t, id, md, sessions = [], size = 12, title = "", whole = null, { acts = null, always = false } = {}) {
     const { full, text, cut } = shortText(md ?? "", sessions.map((s) => s.address).join("\n"));
     return v_flex().id(`${id}-body`).w_full().min_w(0).text_size(size).text_color(t.foreground)
       // Not while the reader is open: a selection spans every selectable text under the drag,
       // so a drag in the reader also picked up the cards behind it.
       .child(TextView.markdown(`${id}-md`, text).selectable(!this.reader).w_full()
         .on_link_click((url, _cx) => this.openLink(url)))
-      .when(cut, (el) => el.child(div().id(`${id}-more`).text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.text_color(t.foreground))
+      .when(cut || always, (el) => el.child(div().id(`${id}-more`).text_size(11).text_color(t.dim).cursor_pointer().hover((s) => s.text_color(t.foreground))
         .tooltip("Read it all")
-        .on_click((_e, cx) => { cx.stop_propagation(); this.reader = { title: shortTitle(title), md: whole ? whole() : formatText(full) }; cx.notify(); })
+        .on_click((_e, cx) => { cx.stop_propagation(); this.openReader(shortTitle(title), whole ? whole() : formatText(full), acts, cx); })
         .child("more")));
+  }
+
+  openReader(title, md, acts, cx) {
+    this.reader = { title, md, acts };
+    cx.notify();
+  }
+
+  // Closing the reader moves an answer box opened in it to its card, text and all.
+  closeReader() {
+    if (this.edit?.inReader) this.edit = { ...this.edit, inReader: false };
+    this.reader = null;
+  }
+
+  // The answer box is open on the card itself (not in the reader).
+  editingOnCard(key) { return this.edit?.key === key && !this.edit.inReader; }
+
+  // The reader's foot: its card's answer box when opened here, else the card's buttons
+  // (acts.ask: {key, label, title} opens the box here; acts.extra(t): more buttons, e.g. ACK and OK).
+  readerFoot(t, acts) {
+    const key = acts.ask?.key;
+    const notes = key ? notesFor(this.view?.draft, key) : [];
+    const here = key && this.edit?.key === key && this.edit.inReader;
+    return v_flex().id("rd-foot").flex_none().px(16).py(10).gap(6).border_t(1).border_color(t.border)
+      .when(notes.length > 0, (el) => el.child(this.drafts(t, "rd", notes)))
+      .child(here ? this.editor(t, key, notes.length > 0)
+        : h_flex().gap(6).items_center()
+          .when(Boolean(key), (el) => el.child(this.btn(t, "rd-ask", notes.length ? `${acts.ask.label} / send drafts` : acts.ask.label,
+            (cx) => this.openEditor(key, acts.ask.title, cx, true), { disabled: Boolean(this.busy) })))
+          .child(div().flex_1())
+          .children(acts.extra ? acts.extra(t) : []));
   }
 
   // The reader: one long text, formatted, in a big scrolling window. Esc / outside click / ✕ close it.
   readerDialog(t) {
     const r = this.reader;
-    const close = (cx) => { this.reader = null; cx.notify(); };
+    const close = (cx) => { this.closeReader(); cx.notify(); };
     const panel = v_flex().id("reader").w(900).h(900).max_w_full().max_h_full().min_h(0).rounded(10).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg()
       .on_click((_e, cx) => cx.stop_propagation())
       .child(h_flex().h(44).flex_none().px(16).gap(10).items_center().border_b(1).border_color(t.border)
@@ -252,7 +284,8 @@ export default class HarnessOverview extends View {
         .child(div().id("rd-close").p(4).rounded(4).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
           .tooltip("Close (Esc)").on_click((_e, cx) => close(cx)).child(svg("mods/workspace-chrome/x.svg").size(14))))
       .child(v_flex().id("rd-body").flex_1().min_h(0).px(24).py(16).overflow_y_scrollbar().text_size(14).text_color(t.foreground)
-        .child(TextView.markdown("rd-md", r.md).selectable(true).w_full().on_link_click((url, _cx) => this.openLink(url))));
+        .child(TextView.markdown("rd-md", r.md).selectable(true).w_full().on_link_click((url, _cx) => this.openLink(url))))
+      .when(Boolean(r.acts), (el) => el.child(this.readerFoot(t, r.acts)));
     return div().id("reader-backdrop").absolute().inset_0().flex().items_center().justify_center().p(32).bg("#00000099")
       .on_click((_e, cx) => close(cx))
       .child(panel);
@@ -290,8 +323,9 @@ export default class HarnessOverview extends View {
 
   card(t, i) {
     const id = `it-${i.qkey}`;
-    const editing = this.edit?.key === i.qkey;
+    const editing = this.editingOnCard(i.qkey);
     const head = cardTitle(i);
+    const acts = { ask: { key: i.qkey, label: "Answer", title: head } };
     const qs = i.question;
     const extra = (i.links ?? []).filter((u) => !(i.text ?? "").includes(u));
     return v_flex().id(id).flex_none().w_full().px(10).py(8).gap(5).rounded(8).bg(t.surface)
@@ -303,10 +337,10 @@ export default class HarnessOverview extends View {
         .when(Boolean(i.due), (el) => el.child(this.chip(t, `${id}-due`, `due ${i.due}`, t.working)))
         .when(Boolean(qs), (el) => el.child(this.chip(t, `${id}-qs`, QS_WORD[qs] ?? qs, qs === "answered" ? t.done : t.accent)))
         .when(Boolean(i.age), (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child(i.age))))
-      .child(this.body(t, id, i.text, i.sessions, 12, head))
+      .child(this.body(t, id, i.text, i.sessions, 12, head, null, { acts }))
       .when(Boolean(i.rec), (el) => el.child(h_flex().gap(4).items_start().text_color(t.done)
         .child(div().flex_none().text_size(11.5).child("★"))
-        .child(this.body(t, `${id}-rec`, i.rec, i.sessions, 11.5, `${head} · recommendation`))))
+        .child(this.body(t, `${id}-rec`, i.rec, i.sessions, 11.5, `${head} · recommendation`, null, { acts }))))
       // Links the text already shows (as a link) aren't repeated as chips.
       .when(i.tasks.length + i.sessions.length + extra.length > 0, (el) => el.child(h_flex().flex_wrap().gap(4)
         .children(i.tasks.map((x) => this.chip(t, `${id}-t-${x}`, x, t.accent)))
@@ -322,7 +356,7 @@ export default class HarnessOverview extends View {
     const notes = notesFor(this.view?.draft, key);
     return v_flex().id(`${id}-ask`).gap(5)
       .when(notes.length > 0, (el) => el.child(this.drafts(t, id, notes)))
-      .child(this.edit?.key === key ? this.editor(t, key, notes.length > 0)
+      .child(this.editingOnCard(key) ? this.editor(t, key, notes.length > 0)
         : h_flex().gap(6).child(this.btn(t, `${id}-askbtn`, notes.length ? `${label} / send drafts` : label, (cx) => this.openEditor(key, title, cx),
           { disabled: Boolean(this.busy), tip: "Ask the manager about this; your text goes with its context" })));
   }
@@ -330,13 +364,14 @@ export default class HarnessOverview extends View {
   taskCard(t, x) {
     const id = `tk-${taskLabel(x)}`;
     const waiting = x.column === "Waiting on you";
+    const acts = { ask: { key: taskKey(x), label: "Ask", title: taskLabel(x) } };
     return v_flex().id(id).flex_none().w_full().px(10).py(8).gap(5).rounded(8).bg(t.surface).border(1).border_color(waiting ? t.blocked : t.border)
       .child(h_flex().gap(6).items_center().min_w(0)
         .child(div().flex_none().font_semibold().text_size(12).text_color(t.foreground).child(taskLabel(x)))
         .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(x.title ?? ""))
         .when(waiting, (el) => el.child(this.chip(t, `${id}-w`, "waiting on you", t.blocked))))
-      .child(this.body(t, `${id}-state`, x.state, x.sessions, 11.5, taskLabel(x)))
-      .when(Boolean(x.last), (el) => el.child(this.body(t, `${id}-last`, `last: ${x.last}`, x.sessions, 12, `${taskLabel(x)} · last`)))
+      .child(this.body(t, `${id}-state`, x.state, x.sessions, 11.5, taskLabel(x), null, { acts }))
+      .when(Boolean(x.last), (el) => el.child(this.body(t, `${id}-last`, `last: ${x.last}`, x.sessions, 12, `${taskLabel(x)} · last`, null, { acts })))
       .when(x.sessions.length > 0, (el) => el.child(h_flex().flex_wrap().gap(4).children(x.sessions.map((s) => this.sessionChip(t, `${id}-s-${s.address}`, s)))))
       .child(this.askRow(t, id, taskKey(x), "Ask", taskLabel(x)));
   }
@@ -358,46 +393,45 @@ export default class HarnessOverview extends View {
     cx.notify();
   }
 
+  // A batch's own buttons: ACK / Un-ACK and OK. `pre`: id prefix (the reader has its own copies);
+  // `done`: runs after ACK, Un-ACK or OK (the reader closes, since the batch moves).
+  batchButtons(t, b, acked, pre, done = () => {}) {
+    return [
+      ...(b.status === "answered" && !acked ? [this.btn(t, `${pre}-ack`, "ACK", (cx) => { this.setAck(b, true, cx); done(cx); },
+        { tip: "Read, nothing to send: hide it under ACKs. The manager isn't told; a new answer brings it back" })] : []),
+      ...(acked ? [this.btn(t, `${pre}-unack`, "Un-ACK", (cx) => { this.setAck(b, false, cx); done(cx); }, { tip: "Back to the open questions" })] : []),
+      ...(b.status === "answered" ? [this.btn(t, `${pre}-ok`, this.busy === `ok-${b.sent}` ? "…" : "OK", (cx) => {
+        this.act(`ok-${b.sent}`, ["ok", b.sent], cx, () => "Answer accepted"); done(cx);
+      }, { primary: true, disabled: Boolean(this.busy), tip: "Tell the manager the answer is OK" })] : []),
+    ];
+  }
+
+  // A Questions card, kept small: per entry its title, the newest answer (else question) cut short,
+  // and one "more" that opens the whole thread in the reader, with the same buttons at its foot.
   batchCard(t, b, known = [], acked = false) {
     const id = `qb-${b.sent}`;
     const last = b.entries.length - 1;
-    const batchBtns = [
-      ...(b.status === "answered" && !acked ? [this.btn(t, `${id}-ack`, "ACK", (cx) => this.setAck(b, true, cx),
-        { tip: "Read, nothing to send: hide it under ACKs. The manager isn't told; a new answer brings it back" })] : []),
-      ...(acked ? [this.btn(t, `${id}-unack`, "Un-ACK", (cx) => this.setAck(b, false, cx), { tip: "Back to the open questions" })] : []),
-      ...(b.status === "answered" ? [this.btn(t, `${id}-ok`, this.busy === `ok-${b.sent}` ? "…" : "OK", (cx) =>
-        this.act(`ok-${b.sent}`, ["ok", b.sent], cx, () => "Answer accepted"), { primary: true, disabled: Boolean(this.busy), tip: "Tell the manager the answer is OK" })] : []),
-    ];
+    const batchBtns = this.batchButtons(t, b, acked, id);
+    const closeReader = (cx) => { this.closeReader(); cx.notify(); };
     return v_flex().id(id).flex_none().w_full().px(10).py(8).gap(6).rounded(8).bg(t.surface).border(1).border_color(b.status === "answered" ? t.done : t.border)
       .child(h_flex().gap(6).items_center()
         .child(div().flex_1().text_size(11).text_color(t.dim).child(`batch ${b.sent}`))
         .child(this.chip(t, `${id}-st`, QS_WORD[b.status] ?? b.status, b.status === "answered" ? t.done : t.accent)))
       .children(b.entries.map((e, k) => {
         const eid = `${id}-e${k}`;
-        const editing = this.edit?.key === e.key;
+        const editing = this.editingOnCard(e.key);
+        const askLabel = e.answers.length > 0 ? "Ask more" : "Ask";
         const thread = () => threadMarkdown(e.name, threadOf(this.view?.batches, e.name), (x) => formatText(linkify(repairCut(x), known)));
-        const openThread = (cx) => { this.reader = { title: `${entryTitle(e)} · thread`, md: thread() }; cx.notify(); };
+        const acts = { ask: { key: e.key, label: askLabel, title: e.name }, extra: (t) => this.batchButtons(t, b, acked, "rd-qb", closeReader) };
         return v_flex().id(eid).gap(4).pt(4).border_t(1).border_color(t.border)
           .child(h_flex().gap(6).items_center().min_w(0)
             .child(this.title(t, `${eid}-title`, e.name, 320, entryTitle(e)))
-            .when(Boolean(e.where), (el) => el.child(this.chip(t, `${eid}-where`, `asked from ${e.where}`, t.dim)))
-            .child(div().flex_1())
-            .child(div().id(`${eid}-thread`).flex_none().text_size(11).text_color(t.accent).cursor_pointer().hover((s) => s.underline())
-              .tooltip("Read the whole thread: what it's about, every question and answer").on_click((_e, cx) => { cx.stop_propagation(); openThread(cx); })
-              .child("Thread")))
-          // The item as it read when asked: what the question is about.
-          .when(Boolean(e.quote), (el) => el.child(div().id(`${eid}-quote`).pl(8).border_l(2).border_color(t.border).text_color(t.dim)
-            .child(this.body(t, `${eid}-quote`, e.quote, known, 11, e.name, thread))))
-          .children(e.questions.map((q, n) => h_flex().id(`${eid}-q${n}`).gap(4).items_start().min_w(0)
-            .child(div().flex_none().text_size(11.5).child("❓"))
-            .child(this.body(t, `${eid}-q${n}`, q, known, 11.5, e.name, thread))))
-          .children(e.answers.map((a, n) => v_flex().id(`${eid}-a${n}`).px(6).py(4).rounded(4).bg(t.chrome).gap(2)
-            .child(div().text_size(10.5).text_color(t.done).child(plain(a.head)))
-            .child(this.body(t, `${eid}-a${n}`, a.body, known, 12, e.name, thread))))
+            .when(Boolean(e.where), (el) => el.child(this.chip(t, `${eid}-where`, `asked from ${e.where}`, t.dim))))
+          .child(this.body(t, `${eid}-pv`, repairCut(entryPreview(e)), known, 11.5, `${entryTitle(e)} · thread`, thread, { acts, always: true }))
           .when(e.draft.length > 0, (el) => el.child(this.drafts(t, eid, e.draft)))
           .child(editing ? this.editor(t, e.key, e.draft.length > 0)
             : h_flex().gap(6).items_center()
-              .child(this.btn(t, `${eid}-more`, e.answers.length > 0 ? "Ask more" : "Ask", (cx) => this.openEditor(e.key, e.name, cx), { disabled: Boolean(this.busy) }))
+              .child(this.btn(t, `${eid}-more`, askLabel, (cx) => this.openEditor(e.key, e.name, cx), { disabled: Boolean(this.busy) }))
               // The batch's own buttons sit at the foot of the card, beside the last entry's Ask more.
               .when(k === last, (el) => el.child(div().flex_1()).children(batchBtns)))
           .when(editing && k === last && batchBtns.length > 0, (el) => el.child(h_flex().gap(6).items_center().child(div().flex_1()).children(batchBtns)));
@@ -428,13 +462,14 @@ export default class HarnessOverview extends View {
       .child(div().flex_none().text_color(t.dim).child("Task"))
       .child(div().min_w(0).truncate().text_color(t.foreground).child(f === null ? "All" : f === NO_TASK ? "No task" : f))
       .child(svg("mods/workspace-chrome/chevron-down.svg").size(12).flex_none().text_color(t.dim));
-    const option = (id, value, label, n) => h_flex().id(`task-opt-${id}`).px(8).py(4).gap(8).items_center().rounded(5).cursor_pointer()
+    const option = (id, value, label, n) => h_flex().id(`task-opt-${id}`).flex_none().h(MENU_ROW).px(8).gap(8).items_center().rounded(5).cursor_pointer()
       .when(f === value, (el) => el.bg(t.selected))
       .hover((s) => s.bg(t.hover))
       .on_click((_e, cx) => { cx.stop_propagation(); this.setTaskFilter(value, cx); })
       .child(div().flex_1().min_w(0).truncate().text_color(value === null || value === NO_TASK ? t.dim : t.foreground).child(label))
       .child(div().flex_none().text_color(t.dim).child(String(n)));
-    const menu = v_flex().id("task-list").w(280).max_h(420).overflow_y_scrollbar().p(4).gap(1).rounded(8).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg().text_size(12)
+    const rows = tasks.length + 2;
+    const menu = v_flex().id("task-list").w(280).h(menuHeight(rows)).overflow_y_scrollbar().p(4).gap(1).rounded(8).bg(t.popover ?? t.surface).border(1).border_color(t.border).shadow_lg().text_size(12)
       .child(option("all", null, "All tasks", all))
       .children(tasks.map(([k, n], i) => option(i, k, k, n)))
       .child(option("none", NO_TASK, "No task", none));
@@ -615,8 +650,9 @@ export default class HarnessOverview extends View {
       .child(div().text_size(11).font_semibold().text_color(t.blocked).child(`Blocked sessions ${blockedHere.length}`))
       .children(blockedHere.map((b) => {
         const key = sessionKey(b);
-        const open = this.edit?.key === key;
+        const open = this.editingOnCard(key);
         const notes = notesFor(d.draft, key);
+        const acts = { ask: { key, label: "Ask", title: b.address } };
         return v_flex().id(`bl-${b.address}`).gap(4)
           .child(h_flex().gap(4).items_center()
             .child(this.sessionChip(t, `bl-s-${b.address}`, { address: b.address, status: "blocked" }))
@@ -630,9 +666,9 @@ export default class HarnessOverview extends View {
             .when(Boolean(b.kind), (el) => el.child(this.chip(t, `bl-k-${b.address}`, b.kind, t.blocked)))
             .when(Boolean(b.since), (el) => el.child(this.chip(t, `bl-a-${b.address}`, `asked ${ago(b.since)}`, t.dim, b.since)))
             .when(Boolean(b.harness?.state), (el) => el.child(this.chip(t, `bl-h-${b.address}`, `h.state ${b.harness.state}`, t.working)))))
-          .when(Boolean(b.question), (el) => el.child(this.body(t, `bl-q-${b.address}`, b.question, known, 11.5, `${b.address} · ${b.title ?? "question"}`)))
-          .when(Boolean(b.harness?.ask), (el) => el.child(this.body(t, `bl-ask-txt-${b.address}`, `ask: ${b.harness.ask}`, known, 11, `${b.address} · ask`)))
-          .when(Boolean(b.harness?.next), (el) => el.child(div().text_color(t.dim).child(this.body(t, `bl-n-${b.address}`, `next: ${b.harness.next}`, known, 11, `${b.address} · next`))))
+          .when(Boolean(b.question), (el) => el.child(this.body(t, `bl-q-${b.address}`, b.question, known, 11.5, `${b.address} · ${b.title ?? "question"}`, null, { acts })))
+          .when(Boolean(b.harness?.ask), (el) => el.child(this.body(t, `bl-ask-txt-${b.address}`, `ask: ${b.harness.ask}`, known, 11, `${b.address} · ask`, null, { acts })))
+          .when(Boolean(b.harness?.next), (el) => el.child(div().text_color(t.dim).child(this.body(t, `bl-n-${b.address}`, `next: ${b.harness.next}`, known, 11, `${b.address} · next`, null, { acts }))))
           .when((b.cards ?? []).length > 0, (el) => el.child(h_flex().flex_wrap().gap(4).items_center()
             .child(div().text_size(10.5).text_color(t.dim).child("on the board:"))
             .children([...b.cards.reduce((m, q) => m.set(q.split("|")[0], (m.get(q.split("|")[0]) ?? 0) + 1), new Map())].map(([col, n], k) => div().id(`bl-c-${b.address}-${k}`).px(5).py(1).rounded(4).border(1).border_color(t.border).text_size(10.5)

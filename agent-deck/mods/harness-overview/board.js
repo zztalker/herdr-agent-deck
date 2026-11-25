@@ -221,24 +221,50 @@ export function threadOf(batches, name) {
     .sort((a, b) => a.sent.localeCompare(b.sent));
 }
 
-// The thread as markdown: where it was asked from and what about (the first real quote), then per
-// batch its questions and answers. `format` shapes each text (formatText in the page).
+// The thread as markdown: where it was asked from and what about (the first real quote), then the
+// batches newest first, each as one timeline of its questions and answers, newest first: an answer
+// sits above the question it answers. `format` shapes each text (formatText in the page).
 export function threadMarkdown(name, entries, format = (x) => x) {
   const out = [];
   const where = entries.find((e) => e.where)?.where;
   const quote = entries.map((e) => e.quote).find((q) => q && !/^follow-up to batch/i.test(q));
   if (where) out.push(`**Asked from ${where}**`, "");
   if (quote) out.push(format(quote).split("\n").map((l) => `> ${l}`).join("\n"), "");
-  for (const e of entries) {
+  for (const e of [...entries].reverse()) {
     out.push(`### Batch ${e.sent} · ${e.status}`, "");
-    for (const q of e.questions ?? []) {
-      const m = q.match(/^\[([^\]]+)\]\s*([\s\S]*)$/);
-      out.push(m ? `**❓ [${m[1]}]** ${format(m[2])}` : `**❓** ${format(q)}`, "");
+    for (const m of timeline(e)) {
+      if (m.q !== undefined) {
+        const t = m.q.match(/^\[([^\]]+)\]\s*([\s\S]*)$/);
+        out.push(t ? `**❓ [${t[1]}]** ${format(t[2])}` : `**❓** ${format(m.q)}`, "");
+      } else out.push(`**${m.a.head}**`, "", format(m.a.body), "");
     }
-    for (const a of e.answers ?? []) out.push(`**${a.head}**`, "", format(a.body), "");
   }
   while (out[out.length - 1] === "") out.pop();
   return out.join("\n");
+}
+
+// An entry's questions and answers, newest first, by the "YYYY-MM-DD HH:MM" each starts with (a
+// question's text, an answer's head). One without a full date (an old "Answer [09:30]") takes the
+// date of the message before it, so it stays next to what it answers, above it.
+const STAMP_RE = /\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/;
+function timeline(e) {
+  let prev = "";
+  const items = [...(e.questions ?? []).map((q) => ({ q, text: q })), ...(e.answers ?? []).map((a) => ({ a, text: a.head }))]
+    .map((m, n) => {
+      const at = (m.text ?? "").slice(0, 40).match(STAMP_RE)?.[0].replace("T", " ") ?? prev;
+      prev = at;
+      return { ...m, at, n };
+    });
+  return items.sort((x, y) => (x.at === y.at ? y.n - x.n : x.at < y.at ? 1 : -1));
+}
+
+// A question card's short text: the newest answer when there is one, else the newest question
+// (its "[stamp]" dropped). The whole thread is one "more" away.
+export function entryPreview(e) {
+  const a = (e.answers ?? []).at(-1);
+  if (a) return `**${a.head}:** ${a.body}`;
+  const q = (e.questions ?? []).at(-1);
+  return q ? `❓ ${q.replace(/^\[[^\]]+\]\s*/, "")}` : "";
 }
 
 // --- render cost --------------------------------------------------------------------------------
@@ -304,8 +330,9 @@ export function dueRefresh(s, now) {
 
 // What Esc closes: the innermost thing open, the board itself last. The reader sits over
 // everything; then the Task menu, the Drafts dialog (its edit box first), the answer box, the filter.
+// An answer box opened inside the reader closes before the reader does.
 export function escapeStep(s) {
-  if (s.reader) return "reader";
+  if (s.reader) return s.edit?.inReader ? "edit" : "reader";
   if (s.message) return "message";
   if (s.taskMenu) return "taskMenu";
   if (s.showDrafts) return s.draftEdit ? "draftEdit" : "drafts";
@@ -347,4 +374,12 @@ export function keepAcks(acks, batches) {
   if (!Array.isArray(acks)) return [];
   const live = new Set(batches.map(ackKey));
   return acks.filter((k) => live.has(k));
+}
+
+// The Task menu's height: its rows' own (MENU_ROW each, 1 px apart, 4 px padding, 1 px border),
+// up to `cap`; past that the list scrolls. A scroll area needs a definite height: with only a
+// max height its rows shrank to fit and the list never scrolled, so the last tasks were cut off.
+export const MENU_ROW = 26;
+export function menuHeight(rows, cap = 480) {
+  return Math.min(rows * MENU_ROW + Math.max(rows - 1, 0) + 8 + 2, cap);
 }

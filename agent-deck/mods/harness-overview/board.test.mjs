@@ -1,7 +1,7 @@
 // node --test board.test.mjs  (from this folder)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, taskLabel, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks } from "./board.js";
+import { parseConfig, shellArgs, plain, columns, matches, CONFIG_PATH, linkify, cutMarkdown, taskOptions, keepTask, NO_TASK, draftGroups, shortTitle, knownSessions, taskKey, taskLabel, sessionKey, notesFor, threadOf, threadMarkdown, memo, cardTitle, entryTitle, repairCut, dueRefresh, escapeStep, messageText, messageTask, ackKey, splitAcks, keepAcks, entryPreview, menuHeight } from "./board.js";
 
 // --- config ----------------------------------------------------------------------------
 
@@ -279,29 +279,39 @@ test("threadOf: every entry about one name, oldest batch first, with its batch's
   assert.deepEqual(threadOf(undefined, "R1"), []);
 });
 
-test("threadMarkdown: what it is about, then each batch's questions and answers in order", () => {
+test("threadMarkdown: what it is about, then the batches newest first, each newest message first", () => {
   const md = threadMarkdown("R1", threadOf(QB, "R1"), (x) => x);
   assert.equal(md, [
     "**Asked from On review**",
     "",
     "> Review login",
     "",
-    "### Batch 2026-01-05 09:00 UTC · accepted",
+    "### Batch 2026-01-06 10:00 UTC · answered",
     "",
-    "**❓ [2026-01-05 09:00]** reachable?",
+    "**Answer [10:30]**",
+    "",
+    "Same.",
+    "",
+    "**❓ [2026-01-06 10:00]** and the API?",
+    "",
+    "### Batch 2026-01-05 09:00 UTC · accepted",
     "",
     "**Answer [09:30]**",
     "",
     "No.",
     "",
-    "### Batch 2026-01-06 10:00 UTC · answered",
-    "",
-    "**❓ [2026-01-06 10:00]** and the API?",
-    "",
-    "**Answer [10:30]**",
-    "",
-    "Same.",
+    "**❓ [2026-01-05 09:00]** reachable?",
   ].join("\n"));
+});
+
+test("threadMarkdown: questions and answers of one batch are one timeline by their stamps, newest first", () => {
+  const e = { sent: "RL-3 @ 2026-11-24 11:00 UTC", status: "answered", where: "release", questions: [
+    "**2026-11-24 10:00 UTC** first?", "**2026-11-24 11:00 UTC** second?"],
+  answers: [{ head: "2026-11-24 10:30 UTC", body: "one" }, { head: "2026-11-24 11:30 UTC", body: "two" }] };
+  const md = threadMarkdown("RL-3", [e], (x) => x);
+  const order = ["two", "second?", "one", "first?"].map((x) => md.indexOf(x));
+  assert.ok(order.every((n) => n >= 0), md);
+  assert.deepEqual(order, [...order].sort((a, b) => a - b), md);
 });
 
 test("threadMarkdown: texts go through the formatter; a follow-up's own quote isn't repeated", () => {
@@ -309,6 +319,15 @@ test("threadMarkdown: texts go through the formatter; a follow-up's own quote is
   assert.match(md, /> REVIEW LOGIN/);
   assert.match(md, /SAME\./);
   assert.doesNotMatch(md, /follow-up to batch/i);
+});
+
+test("entryPreview: the newest answer when there is one, else the newest question, stamp dropped", () => {
+  const q = { questions: ["[2026-01-05 09:00] reachable?", "[2026-01-05 10:00] and now?"], answers: [] };
+  assert.equal(entryPreview(q), "❓ and now?");
+  const a = { ...q, answers: [{ head: "Answer [09:30]", body: "No." }, { head: "Answer [10:30]", body: "Yes, **now**." }] };
+  assert.equal(entryPreview(a), "**Answer [10:30]:** Yes, **now**.");
+  assert.equal(entryPreview({ questions: [], answers: [] }), "");
+  assert.equal(entryPreview({ questions: ["plain"], answers: [] }), "❓ plain");
 });
 
 // --- render cost --------------------------------------------------------------------------------
@@ -380,6 +399,9 @@ test("Esc closes the innermost thing first, the board last", () => {
   // The Message dialog sits over the board, under the reader.
   assert.equal(escapeStep({ ...none, message: { task: "x" }, taskMenu: true, edit: { key: "k" } }), "message");
   assert.equal(escapeStep({ ...none, message: { task: "x" }, reader: { md: "x" } }), "reader");
+  // An answer box opened in the reader closes before the reader; one on a card behind it doesn't.
+  assert.equal(escapeStep({ ...none, reader: { md: "x" }, edit: { key: "k", inReader: true } }), "edit");
+  assert.equal(escapeStep({ ...none, reader: { md: "x" }, edit: { key: "k" } }), "reader");
 });
 
 // --- the Message button -------------------------------------------------------------------
@@ -419,4 +441,11 @@ test("stored ACKs keep only batches still on the board", () => {
 test("a task card is named by its subtask id when it has one, else by its task", () => {
   assert.equal(taskLabel({ task: "release", id: "RL-3" }), "RL-3");
   assert.equal(taskLabel({ task: "infra" }), "infra");
+});
+
+test("menuHeight: the rows' own height, up to the cap; the rest scrolls", () => {
+  assert.equal(menuHeight(3), 3 * 26 + 2 * 1 + 8 + 2, "3 rows of 26, 2 gaps, padding and border");
+  assert.equal(menuHeight(1), 26 + 10);
+  assert.equal(menuHeight(40), 480, "many tasks: capped, scrolls");
+  assert.equal(menuHeight(40, 300), 300);
 });
